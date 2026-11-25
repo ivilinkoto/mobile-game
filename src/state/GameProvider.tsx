@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 
 import * as E from '../game/engine';
@@ -14,8 +14,7 @@ export interface SpinTicket {
   commit: () => void;
 }
 
-interface GameApi {
-  state: GameState;
+export interface GameActions {
   spin: () => SpinTicket | null;
   cycleBet: () => void;
   build: (b: number) => boolean;
@@ -31,20 +30,94 @@ interface GameApi {
   resetGame: () => void;
 }
 
-const Ctx = createContext<GameApi | null>(null);
+/** Tiny external store: the single source of truth for the game state. */
+function createGameStore() {
+  let state: GameState | null = null;
+  const listeners = new Set<() => void>();
 
-export function useGame(): GameApi {
-  const api = useContext(Ctx);
-  if (!api) throw new Error('useGame must be used inside <GameProvider>');
-  return api;
+  const get = () => state;
+  const set = (next: GameState) => {
+    if (next === state) return;
+    state = next;
+    listeners.forEach((l) => l());
+  };
+  const subscribe = (l: () => void) => {
+    listeners.add(l);
+    return () => {
+      listeners.delete(l);
+    };
+  };
+
+  /** Run an engine step on the current state; commit it if it produced one. */
+  function run<R>(fn: (s: GameState) => { state: GameState; value: R } | null): R | null {
+    if (!state) return null;
+    const out = fn(state);
+    if (!out) return null;
+    set(out.state);
+    return out.value;
+  }
+  const just = (fn: (s: GameState) => GameState) => {
+    run((s) => ({ state: fn(s), value: true }));
+  };
+  const wrap = (s: GameState | null) => (s ? { state: s, value: true } : null);
+
+  const actions: GameActions = {
+    spin: () => {
+      if (!state) return null;
+      const before = state;
+      const out = E.spin(before, mathRng, Date.now());
+      if (!out) return null;
+      // Deduct the spin right away so a double tap can't spin twice;
+      // the full result is committed when the reels stop.
+      set({ ...before, spins: before.spins - before.bet });
+      return { result: out.result, commit: () => set(out.state) };
+    },
+    cycleBet: () => just(E.cycleBet),
+    build: (b) => !!run((s) => wrap(E.build(s, b, Date.now()))),
+    repair: (b) => !!run((s) => wrap(E.repair(s, b, Date.now()))),
+    attack: (id, b) =>
+      run((s) => {
+        const r = E.attack(s, id, b, mathRng, Date.now());
+        return r ? { state: r.state, value: { coins: r.coins, blocked: r.blocked } } : null;
+      }),
+    dig: (spot) =>
+      run((s) => {
+        const r = E.dig(s, spot, Date.now());
+        return r ? { state: r.state, value: r.coins } : null;
+      }),
+    closeRaid: () => just(E.closeRaid),
+    prepareStorm: () => just((s) => E.prepareStorm(s, mathRng)),
+    cancelStorm: () => just(E.cancelStorm),
+    unleashStorm: (id) =>
+      run((s) => {
+        const r = E.unleashStorm(s, id, mathRng, Date.now());
+        return r ? { state: r.state, value: r.coins } : null;
+      }),
+    dismissIslandComplete: () => just(E.dismissIslandComplete),
+    markLogRead: () => just(E.markLogRead),
+    resetGame: () => set(E.createInitialState(Date.now(), mathRng)),
+  };
+
+  return { get, set, subscribe, actions };
+}
+
+type GameStore = ReturnType<typeof createGameStore>;
+
+const Ctx = createContext<GameStore | null>(null);
+
+export function useGame(): GameActions & { state: GameState } {
+  const store = useContext(Ctx);
+  if (!store) throw new Error('useGame must be used inside <GameProvider>');
+  const state = useSyncExternalStore(store.subscribe, store.get);
+  if (!state) throw new Error('Game state not loaded');
+  return { ...store.actions, state };
 }
 
 export function GameProvider({ children, fallback }: { children: ReactNode; fallback: ReactNode }) {
-  const [state, setState] = useState<GameState | null>(null);
-  const stateRef = useRef<GameState | null>(null);
-  stateRef.current = state;
+  const [store] = useState(createGameStore);
+  const state = useSyncExternalStore(store.subscribe, store.get);
 
-  // Load once.
+  // Load the save once (or start a new game).
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -56,102 +129,46 @@ export function GameProvider({ children, fallback }: { children: ReactNode; fall
         loaded = null;
       }
       const now = Date.now();
-      const s = loaded ? E.catchUp(loaded, now, mathRng) : E.createInitialState(now, mathRng);
-      if (!cancelled) setState(s);
+      if (!cancelled) store.set(loaded ? E.catchUp(loaded, now, mathRng) : E.createInitialState(now, mathRng));
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [store]);
 
-  // Save (debounced) whenever state changes.
+  // Save (debounced) on every change.
   useEffect(() => {
-    if (!state) return;
-    const id = setTimeout(() => {
-      AsyncStorage.setItem(SAVE_KEY, JSON.stringify(state)).catch(() => {});
-    }, 400);
-    return () => clearTimeout(id);
-  }, [state]);
-
-  // Foreground / background handling and periodic regen.
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (next) => {
-      const now = Date.now();
-      if (next === 'active') setState((s) => (s ? E.catchUp(s, now, mathRng) : s));
-      else setState((s) => (s ? E.touch(s, now) : s));
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const unsub = store.subscribe(() => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const s = store.get();
+        if (s) AsyncStorage.setItem(SAVE_KEY, JSON.stringify(s)).catch(() => {});
+      }, 400);
     });
-    const id = setInterval(() => {
-      setState((s) => (s ? E.touch(E.regenSpins(s, Date.now()), Date.now()) : s));
-    }, 15_000);
+    return () => {
+      clearTimeout(timer);
+      unsub();
+    };
+  }, [store]);
+
+  // Foreground / background handling and periodic spin regeneration.
+  useEffect(() => {
+    const update = (fn: (s: GameState, now: number) => GameState) => {
+      const s = store.get();
+      if (s) store.set(fn(s, Date.now()));
+    };
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') update((s, now) => E.catchUp(s, now, mathRng));
+      else update(E.touch);
+    });
+    const id = setInterval(() => update((s, now) => E.touch(E.regenSpins(s, now), now)), 15_000);
     return () => {
       sub.remove();
       clearInterval(id);
     };
-  }, []);
+  }, [store]);
 
-  /** Run an engine call against the latest state; commit if it returned a state. */
-  const apply = useCallback(<R,>(fn: (s: GameState) => { state: GameState; value: R } | null): R | null => {
-    const cur = stateRef.current;
-    if (!cur) return null;
-    const out = fn(cur);
-    if (!out) return null;
-    stateRef.current = out.state;
-    setState(out.state);
-    return out.value;
-  }, []);
-
-  const api = useMemo<GameApi | null>(() => {
-    if (!state) return null;
-    return {
-      state,
-      spin: () => {
-        const cur = stateRef.current;
-        if (!cur) return null;
-        const out = E.spin(cur, mathRng, Date.now());
-        if (!out) return null;
-        // Deduct the spin immediately so double taps can't spin twice.
-        const locked: GameState = { ...cur, spins: cur.spins - cur.bet, pending: cur.pending };
-        stateRef.current = locked;
-        setState(locked);
-        return {
-          result: out.result,
-          commit: () => {
-            stateRef.current = out.state;
-            setState(out.state);
-          },
-        };
-      },
-      cycleBet: () => apply((s) => ({ state: E.cycleBet(s), value: true })),
-      build: (b) => !!apply((s) => wrap(E.build(s, b, Date.now()))),
-      repair: (b) => !!apply((s) => wrap(E.repair(s, b, Date.now()))),
-      attack: (id, b) =>
-        apply((s) => {
-          const r = E.attack(s, id, b, mathRng, Date.now());
-          return r ? { state: r.state, value: { coins: r.coins, blocked: r.blocked } } : null;
-        }),
-      dig: (spot) =>
-        apply((s) => {
-          const r = E.dig(s, spot, Date.now());
-          return r ? { state: r.state, value: r.coins } : null;
-        }),
-      closeRaid: () => apply((s) => ({ state: E.closeRaid(s), value: true })),
-      prepareStorm: () => apply((s) => ({ state: E.prepareStorm(s, mathRng), value: true })),
-      cancelStorm: () => apply((s) => ({ state: E.cancelStorm(s), value: true })),
-      unleashStorm: (id) =>
-        apply((s) => {
-          const r = E.unleashStorm(s, id, mathRng, Date.now());
-          return r ? { state: r.state, value: r.coins } : null;
-        }),
-      dismissIslandComplete: () => apply((s) => ({ state: E.dismissIslandComplete(s), value: true })),
-      markLogRead: () => apply((s) => ({ state: E.markLogRead(s), value: true })),
-      resetGame: () => apply(() => ({ state: E.createInitialState(Date.now(), mathRng), value: true })),
-    };
-  }, [state, apply]);
-
-  if (!api) return <>{fallback}</>;
-  return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
-}
-
-function wrap(s: GameState | null) {
-  return s ? { state: s, value: true } : null;
+  if (!state) return <>{fallback}</>;
+  return <Ctx.Provider value={store}>{children}</Ctx.Provider>;
 }

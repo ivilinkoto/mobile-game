@@ -85,21 +85,12 @@ export const ISLAND_COST_GROWTH = 1.9;
 export const REPAIR_FACTOR = 0.4;
 
 export interface IslandDef {
+  /** Theme key — colours and art live in src/art/themes.ts. */
   key: string;
-  emoji: string;
-  sea: string; // background color
-  land: string;
-  buildings: string[]; // emoji per building
 }
 
 /** Islands loop after the last one with growing costs. */
-export const ISLANDS: IslandDef[] = [
-  { key: 'tropic', emoji: '🏝️', sea: '#2aa7c9', land: '#f3d98b', buildings: ['⛺', '🛖', '⛵', '🗼', '🏰'] },
-  { key: 'glacier', emoji: '🧊', sea: '#5b8fb9', land: '#e8f4fb', buildings: ['🛷', '🏠', '🐧', '⛪', '🏯'] },
-  { key: 'volcano', emoji: '🌋', sea: '#7a3b2e', land: '#4a3b35', buildings: ['🔥', '⚒️', '🏭', '🗿', '🏛️'] },
-  { key: 'sunken', emoji: '🐚', sea: '#1b4f72', land: '#76b5c5', buildings: ['🪸', '🐙', '🏺', '🔱', '🕌'] },
-  { key: 'sky', emoji: '☁️', sea: '#8ec5ff', land: '#ffffff', buildings: ['🎈', '🪁', '🌈', '🛸', '🏙️'] },
-];
+export const ISLANDS: IslandDef[] = [{ key: 'tropic' }, { key: 'glacier' }, { key: 'volcano' }, { key: 'sunken' }, { key: 'sky' }];
 
 // ── Incoming attacks while away ──────────────────────────────────
 export const INCOMING = {
@@ -113,6 +104,5 @@ export const INCOMING = {
 
 export const RIVAL_COUNT = 8;
 export const RIVAL_NAMES = ['Mara', 'Bruno', 'Elena', 'Tariq', 'Yuki', 'Ivo', 'Sven', 'Lucia', 'Nadia', 'Kofi'];
-export const RIVAL_AVATARS = ['🧔', '👩‍🦰', '🧑‍✈️', '👳', '👩', '🧑', '👨‍🦳', '👱‍♀️', '🧕', '👨🏾'];
 
 export const LOG_LIMIT = 30;

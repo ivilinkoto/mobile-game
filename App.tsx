@@ -1,22 +1,25 @@
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Rubik_500Medium, Rubik_700Bold, Rubik_800ExtraBold, Rubik_900Black, useFonts } from '@expo-google-fonts/rubik';
 
 import { GameScreen } from './src/screens/GameScreen';
 import { GameProvider } from './src/state/GameProvider';
-import { colors } from './src/ui/theme';
+
+const loading = (
+  <View style={{ flex: 1, backgroundColor: '#0b1e36', alignItems: 'center', justifyContent: 'center' }}>
+    <ActivityIndicator color="#ffcf33" size="large" />
+  </View>
+);
 
 export default function App() {
+  const [fontsLoaded, fontError] = useFonts({ Rubik_500Medium, Rubik_700Bold, Rubik_800ExtraBold, Rubik_900Black });
+  if (!fontsLoaded && !fontError) return loading;
+
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />
-      <GameProvider
-        fallback={
-          <View style={{ flex: 1, backgroundColor: colors.night, alignItems: 'center', justifyContent: 'center' }}>
-            <ActivityIndicator color={colors.gold} size="large" />
-          </View>
-        }
-      >
+      <GameProvider fallback={loading}>
         <GameScreen />
       </GameProvider>
     </SafeAreaProvider>

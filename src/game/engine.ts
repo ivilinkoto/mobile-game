@@ -17,7 +17,6 @@ import {
   REPAIR_FACTOR,
   REWARD,
   REWARD_SCALE_GROWTH,
-  RIVAL_AVATARS,
   RIVAL_COUNT,
   RIVAL_NAMES,
   SAVE_VERSION,
@@ -108,7 +107,6 @@ function makeRival(i: number, playerIsland: number, rng: Rng): Rival {
   return {
     id: `r${i}`,
     name: RIVAL_NAMES[i % RIVAL_NAMES.length],
-    avatar: RIVAL_AVATARS[i % RIVAL_AVATARS.length],
     islandIndex: island,
     buildings,
     damaged: buildings.map(() => false),

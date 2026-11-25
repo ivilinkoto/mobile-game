@@ -1,17 +1,19 @@
-import { useRef, type ReactNode } from 'react';
-import { Animated, Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
+import { type ReactNode, useState } from 'react';
+import { Animated, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 
-import { colors } from './theme';
+import { GameText } from './GameText';
 
-type Variant = 'gold' | 'green' | 'storm' | 'wood' | 'danger';
+type Variant = 'gold' | 'green' | 'storm' | 'wood' | 'danger' | 'blue';
 
-const PALETTE: Record<Variant, { bg: string; edge: string; fg: string }> = {
-  gold: { bg: colors.gold, edge: colors.goldDark, fg: colors.text },
-  green: { bg: colors.green, edge: colors.greenDark, fg: '#fff' },
-  storm: { bg: colors.storm, edge: colors.stormDark, fg: '#fff' },
-  wood: { bg: colors.wood, edge: colors.woodDark, fg: colors.textLight },
-  danger: { bg: colors.danger, edge: '#a3262a', fg: '#fff' },
+const PALETTE: Record<Variant, { top: string; bottom: string; edge: string; fg: string; outline: string }> = {
+  gold: { top: '#ffe766', bottom: '#ffa81c', edge: '#b35f00', fg: '#fff', outline: '#8a3f00' },
+  green: { top: '#8ee85a', bottom: '#2fa83a', edge: '#1b6b22', fg: '#fff', outline: '#145218' },
+  storm: { top: '#b49bff', bottom: '#6a3fe0', edge: '#3b1f99', fg: '#fff', outline: '#2c1673' },
+  wood: { top: '#c98a4b', bottom: '#8a5a2b', edge: '#4d2f12', fg: '#fff3d6', outline: '#3a2210' },
+  danger: { top: '#ff8a7a', bottom: '#e0323a', edge: '#8f1820', fg: '#fff', outline: '#6b1016' },
+  blue: { top: '#7fd3ff', bottom: '#2a86e0', edge: '#164f8f', fg: '#fff', outline: '#0f3a6b' },
 };
 
 interface Props {
@@ -22,44 +24,73 @@ interface Props {
   disabled?: boolean;
   size?: 'sm' | 'md' | 'lg';
   style?: StyleProp<ViewStyle>;
+  contentStyle?: StyleProp<ViewStyle>;
 }
 
-export function GameButton({ label, children, onPress, variant = 'gold', disabled, size = 'md', style }: Props) {
-  const scale = useRef(new Animated.Value(1)).current;
-  const p = PALETTE[variant];
-  const pad = size === 'lg' ? 16 : size === 'sm' ? 6 : 10;
-  const font = size === 'lg' ? 26 : size === 'sm' ? 14 : 17;
+/** Glossy, chunky 3D button with a press-down bounce. */
+export function GameButton({ label, children, onPress, variant = 'gold', disabled, size = 'md', style, contentStyle }: Props) {
+  const scale = useState(() => new Animated.Value(1))[0];
+  const p = PALETTE[disabled ? 'wood' : variant];
+  const pad = size === 'lg' ? 14 : size === 'sm' ? 7 : 10;
+  const font = size === 'lg' ? 30 : size === 'sm' ? 15 : 19;
+  const radius = size === 'lg' ? 22 : 14;
 
-  const to = (v: number) => Animated.spring(scale, { toValue: v, useNativeDriver: true, speed: 40, bounciness: 8 }).start();
+  const to = (v: number) => Animated.spring(scale, { toValue: v, useNativeDriver: true, speed: 40, bounciness: 10 }).start();
 
   return (
     <Animated.View style={[{ transform: [{ scale }] }, style]}>
       <Pressable
         disabled={disabled}
-        onPressIn={() => to(0.94)}
+        onPressIn={() => to(0.93)}
         onPressOut={() => to(1)}
         onPress={() => {
           Haptics.selectionAsync().catch(() => {});
           onPress();
         }}
-        style={[
-          styles.btn,
-          { backgroundColor: p.bg, borderBottomColor: p.edge, paddingVertical: pad, opacity: disabled ? 0.45 : 1 },
-        ]}
+        style={[styles.outer, { borderRadius: radius + 3, backgroundColor: p.edge, opacity: disabled ? 0.6 : 1 }]}
       >
-        {label ? <Text style={[styles.label, { color: p.fg, fontSize: font }]}>{label}</Text> : children}
+        <LinearGradient
+          colors={[p.top, p.bottom]}
+          style={[styles.face, { borderRadius: radius, paddingVertical: pad }, contentStyle]}
+        >
+          <View style={[styles.gloss, { borderRadius: radius }]} pointerEvents="none" />
+          {label ? (
+            <GameText size={font} color={p.fg} outline={p.outline}>
+              {label}
+            </GameText>
+          ) : (
+            children
+          )}
+        </LinearGradient>
       </Pressable>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  btn: {
-    borderRadius: 14,
-    borderBottomWidth: 5,
+  outer: {
+    paddingBottom: 5,
+    padding: 2,
+    borderWidth: 2,
+    borderColor: '#2b1606',
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
+  },
+  face: {
     paddingHorizontal: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
-  label: { fontWeight: '900', letterSpacing: 0.5 },
+  gloss: {
+    position: 'absolute',
+    left: 4,
+    right: 4,
+    top: 3,
+    height: '42%',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
 });

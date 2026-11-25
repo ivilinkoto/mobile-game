@@ -1,46 +1,87 @@
 // Popups for the PvP actions: cannon attack, treasure raid and storm.
 
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Circle, Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 
+import { Avatar } from '../art/Avatar';
+import { Building } from '../art/Buildings';
+import { CannonIcon, ChestIcon, CoinIcon, DigSpotIcon, MapIcon, ShieldIcon, StormIcon } from '../art/Icons';
+import { IslandScene } from '../art/IslandScene';
+import { themeFor } from '../art/themes';
 import { REWARD } from '../game/config';
 import { islandDef, raidFinished } from '../game/engine';
 import type { Rival } from '../game/types';
 import { formatCoins, t } from '../i18n';
 import { useGame } from '../state/GameProvider';
 import { GameButton } from '../ui/GameButton';
+import { GameText } from '../ui/GameText';
 import { Sheet } from '../ui/Sheet';
-import { colors } from '../ui/theme';
-import { IslandView } from './IslandView';
 
 function RivalRow({ rival, onPress, selected }: { rival: Rival; onPress: () => void; selected?: boolean }) {
   const def = islandDef(rival.islandIndex);
   return (
-    <Pressable onPress={onPress} style={[styles.rival, selected && styles.rivalSelected]}>
-      <Text style={styles.avatar}>{rival.avatar}</Text>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.rivalName}>{rival.name}</Text>
-        <Text style={styles.rivalMeta}>
-          {def.emoji} {t.islandN(rival.islandIndex + 1)} · {'⚓'.repeat(rival.shields) || '—'}
-        </Text>
-      </View>
-      {rival.revenge ? <Text style={styles.revenge}>⚔️ {t.revenge}</Text> : null}
+    <Pressable onPress={onPress}>
+      {({ pressed }) => (
+        <LinearGradient
+          colors={rival.revenge ? ['#ffe1dc', '#f7b9ae'] : ['#fffaf0', '#f1deb4']}
+          style={[styles.rival, selected && styles.rivalSelected, pressed && { transform: [{ scale: 0.97 }] }]}
+        >
+          <Avatar seed={rival.name} size={52} ring={rival.revenge ? '#e5383b' : '#ffcf33'} />
+          <View style={{ flex: 1, gap: 2 }}>
+            <GameText size={18} color="#3a2210" outline={false}>
+              {rival.name}
+            </GameText>
+            <GameText size={12} weight="bold" color="#8c6a3e" outline={false}>
+              {t.islandN(rival.islandIndex + 1)} · {t.islandNames[def.key]}
+            </GameText>
+          </View>
+          <View style={{ alignItems: 'flex-end', gap: 4 }}>
+            {rival.revenge ? (
+              <View style={styles.revenge}>
+                <GameText size={11} outline="#6b1016">
+                  {t.revenge} +50%
+                </GameText>
+              </View>
+            ) : null}
+            <View style={{ flexDirection: 'row' }}>
+              {rival.shields > 0 ? (
+                Array.from({ length: rival.shields }, (_, i) => <ShieldIcon key={i} size={20} />)
+              ) : (
+                <ShieldIcon size={20} dim />
+              )}
+            </View>
+          </View>
+        </LinearGradient>
+      )}
     </Pressable>
   );
 }
 
-export function AttackSheet({ onResult }: { onResult: (text: string) => void }) {
+function Crosshair({ size }: { size: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 40 40">
+      <Circle cx="20" cy="20" r="14" stroke="#e5383b" strokeWidth="4" fill="none" />
+      <Circle cx="20" cy="20" r="4" fill="#e5383b" />
+      <Path d="M20 2 L20 10 M20 30 L20 38 M2 20 L10 20 M30 20 L38 20" stroke="#e5383b" strokeWidth="4" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function AttackSheet({ onResult }: { onResult: (coins: number, text: string) => void }) {
   const { state, attack } = useGame();
   const [chosen, setChosen] = useState<string | null>(null);
   const p = state.pending;
   const visible = p?.type === 'attack';
   const targets = visible ? state.rivals.filter((r) => p.targetIds.includes(r.id)) : [];
   const rival = targets.find((r) => r.id === chosen) ?? null;
+  const theme = rival ? themeFor(islandDef(rival.islandIndex).key) : null;
 
   return (
-    <Sheet visible={visible} title={`💣 ${rival ? t.attackPickBuilding : t.attackTitle}`}>
-      {!rival ? (
+    <Sheet visible={visible} title={rival ? t.attackPickBuilding : t.attackTitle} icon={<CannonIcon size={30} />}>
+      {!rival || !theme ? (
         <View style={{ gap: 8 }}>
           {targets.map((r) => (
             <RivalRow key={r.id} rival={r} onPress={() => setChosen(r.id)} />
@@ -49,24 +90,30 @@ export function AttackSheet({ onResult }: { onResult: (text: string) => void }) 
       ) : (
         <View style={{ gap: 10 }}>
           <RivalRow rival={rival} onPress={() => setChosen(null)} selected />
-          <IslandView islandIndex={rival.islandIndex} buildings={rival.buildings} damaged={rival.damaged} compact />
+          <View style={styles.scene}>
+            <IslandScene theme={theme} buildings={rival.buildings} damaged={rival.damaged} compact />
+          </View>
           <View style={styles.buildingRow}>
-            {islandDef(rival.islandIndex).buildings.map((emoji, b) => (
+            {rival.buildings.map((level, b) => (
               <Pressable
                 key={b}
-                disabled={rival.buildings[b] === 0}
+                disabled={level === 0}
                 onPress={() => {
                   const r = attack(rival.id, b);
                   setChosen(null);
                   if (r) {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
-                    onResult(`${r.blocked ? t.blocked : t.hit} +${formatCoins(r.coins)} 🪙`);
+                    onResult(r.coins, r.blocked ? t.blocked : t.hit);
                   }
                 }}
-                style={[styles.target, rival.buildings[b] === 0 && { opacity: 0.25 }]}
+                style={({ pressed }) => [styles.target, level === 0 && { opacity: 0.3 }, pressed && { transform: [{ scale: 0.92 }] }]}
               >
-                <Text style={{ fontSize: 30 }}>{emoji}</Text>
-                <Text style={styles.crosshair}>🎯</Text>
+                <Building type={b} level={level} damaged={rival.damaged[b]} theme={theme} size={50} still />
+                {level > 0 ? (
+                  <View style={styles.crosshair}>
+                    <Crosshair size={22} />
+                  </View>
+                ) : null}
               </Pressable>
             ))}
           </View>
@@ -79,17 +126,28 @@ export function AttackSheet({ onResult }: { onResult: (text: string) => void }) 
 export function RaidSheet() {
   const { state, dig, closeRaid } = useGame();
   const p = state.pending;
-  const visible = p?.type === 'raid';
-  if (!visible) return <Sheet visible={false} title="">{null}</Sheet>;
+  if (p?.type !== 'raid') return null;
   const rival = state.rivals.find((r) => r.id === p.rivalId);
   const done = raidFinished(state);
   const total = p.dug.reduce((s, i) => s + p.spots[i], 0);
+  const best = Math.max(...p.spots);
 
   return (
-    <Sheet visible title={`🗺️ ${t.raidTitle(rival?.name ?? '?')}`}>
-      <Text style={styles.hint}>
-        {done ? `+${formatCoins(total)} 🪙` : t.raidHint(REWARD.raidDigs - p.dug.length)}
-      </Text>
+    <Sheet visible title={t.raidTitle(rival?.name ?? '?')} icon={<MapIcon size={30} />}>
+      <View style={styles.raidHeader}>
+        {done ? (
+          <>
+            <CoinIcon size={28} />
+            <GameText size={26} color="#ffcf33" outline="#5a3000">
+              +{formatCoins(total)}
+            </GameText>
+          </>
+        ) : (
+          <GameText size={17} color="#7a4a1f" outline={false}>
+            {t.raidHint(REWARD.raidDigs - p.dug.length)}
+          </GameText>
+        )}
+      </View>
       <View style={styles.grid}>
         {p.spots.map((value, i) => {
           const isDug = p.dug.includes(i);
@@ -101,28 +159,55 @@ export function RaidSheet() {
               onPress={() => {
                 if (dig(i) !== null) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
               }}
-              style={[styles.spot, isDug && styles.spotDug, done && !isDug && { opacity: 0.5 }]}
+              style={({ pressed }) => [styles.spotWrap, pressed && { transform: [{ scale: 0.94 }] }]}
             >
-              <Text style={{ fontSize: 40 }}>{reveal ? (value === Math.max(...p.spots) ? '👑' : '🪙') : '❌'}</Text>
-              {reveal ? <Text style={styles.spotValue}>{formatCoins(value)}</Text> : null}
+              <LinearGradient
+                colors={isDug ? ['#fff3c4', '#f2cf6b'] : ['#f2d394', '#d2a55c']}
+                style={[styles.spot, done && !isDug && { opacity: 0.55 }]}
+              >
+                {reveal ? (
+                  value === best ? (
+                    <ChestIcon size={64} open />
+                  ) : (
+                    <View style={styles.pile}>
+                      <CoinIcon size={40} />
+                      <View style={{ marginLeft: -18, marginTop: 10 }}>
+                        <CoinIcon size={34} />
+                      </View>
+                    </View>
+                  )
+                ) : (
+                  <DigSpotIcon size={72} />
+                )}
+                {reveal ? (
+                  <GameText size={17} color="#fff" outline="#5a3000">
+                    {formatCoins(value)}
+                  </GameText>
+                ) : null}
+              </LinearGradient>
             </Pressable>
           );
         })}
       </View>
-      {done ? <GameButton label={t.collect} variant="green" onPress={closeRaid} style={{ marginTop: 12 }} /> : null}
+      {done ? <GameButton label={t.collect} variant="green" size="md" onPress={closeRaid} style={{ marginTop: 12 }} /> : null}
     </Sheet>
   );
 }
 
-export function StormSheet({ onResult }: { onResult: (text: string) => void }) {
+export function StormSheet({ onResult }: { onResult: (coins: number, text: string) => void }) {
   const { state, unleashStorm, cancelStorm } = useGame();
   const p = state.pending;
   const visible = p?.type === 'storm';
   const targets = visible ? state.rivals.filter((r) => p.targetIds.includes(r.id)) : [];
 
   return (
-    <Sheet visible={visible} title={`🌪️ ${t.stormChoose}`} onClose={cancelStorm}>
-      <Text style={styles.hint}>{t.stormIgnoresShields}</Text>
+    <Sheet visible={visible} title={t.stormChoose} icon={<StormIcon size={30} />} onClose={cancelStorm}>
+      <GameText size={14} weight="bold" color="#5a35d6" outline={false} style={{ textAlign: 'center', marginBottom: 8 }}>
+        {t.stormIgnoresShields}
+      </GameText>
+      <GameText size={12} weight="bold" color="#8c6a3e" outline={false} style={{ textAlign: 'center', marginTop: -4, marginBottom: 8 }}>
+        {t.stormHint}
+      </GameText>
       <View style={{ gap: 8 }}>
         {targets.map((r) => (
           <RivalRow
@@ -132,13 +217,12 @@ export function StormSheet({ onResult }: { onResult: (text: string) => void }) {
               const coins = unleashStorm(r.id);
               if (coins !== null) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-                onResult(`🌪️ +${formatCoins(coins)} 🪙`);
+                onResult(coins, t.storm);
               }
             }}
           />
         ))}
       </View>
-      <GameButton label={t.cancel} variant="wood" onPress={cancelStorm} style={{ marginTop: 12 }} />
     </Sheet>
   );
 }
@@ -148,39 +232,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    padding: 10,
-    borderRadius: 14,
-    backgroundColor: '#f6ead0',
+    padding: 8,
+    borderRadius: 16,
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: '#e2c48a',
   },
-  rivalSelected: { borderColor: colors.goldDark },
-  avatar: { fontSize: 34 },
-  rivalName: { fontWeight: '900', fontSize: 17, color: colors.text },
-  rivalMeta: { color: colors.muted, fontWeight: '600' },
-  revenge: { color: colors.danger, fontWeight: '900' },
+  rivalSelected: { borderColor: '#d98a00', borderWidth: 3 },
+  revenge: { backgroundColor: '#e5383b', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
+  scene: { height: 170, borderRadius: 18, overflow: 'hidden', borderWidth: 3, borderColor: '#8a5a2b' },
   buildingRow: { flexDirection: 'row', justifyContent: 'space-between' },
   target: {
-    width: 56,
-    height: 64,
-    borderRadius: 12,
-    backgroundColor: '#f6ead0',
+    width: 58,
+    height: 62,
+    borderRadius: 14,
+    backgroundColor: '#f1deb4',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#d2a55c',
   },
-  crosshair: { position: 'absolute', bottom: 2, right: 2, fontSize: 14 },
-  hint: { textAlign: 'center', color: colors.muted, fontWeight: '700', marginBottom: 10, fontSize: 16 },
+  crosshair: { position: 'absolute', right: -4, bottom: -4 },
+  raidHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 10, minHeight: 32 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
+  spotWrap: { width: '46%' },
   spot: {
-    width: '45%',
-    aspectRatio: 1.2,
-    borderRadius: 16,
-    backgroundColor: '#e9cf98',
+    aspectRatio: 1.15,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
-    borderColor: colors.panelEdge,
+    borderColor: '#a87a3a',
   },
-  spotDug: { backgroundColor: '#fff3c4', borderColor: colors.gold },
-  spotValue: { fontWeight: '900', color: colors.text, fontSize: 16 },
+  pile: { flexDirection: 'row' },
 });

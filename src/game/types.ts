@@ -17,7 +17,6 @@ export type OutcomeKind =
 export interface Rival {
   id: string;
   name: string;
-  avatar: string;
   islandIndex: number;
   buildings: number[]; // level per building, 0 = not built
   damaged: boolean[];
