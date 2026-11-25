@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -7,6 +7,7 @@ import { Rubik_500Medium, Rubik_700Bold, Rubik_800ExtraBold, Rubik_900Black, use
 import { startAudio } from './src/audio/sound';
 import { loadLang } from './src/i18n';
 import { GameScreen } from './src/screens/GameScreen';
+import { TitleScreen } from './src/screens/TitleScreen';
 import { GameProvider } from './src/state/GameProvider';
 
 const loading = (
@@ -17,6 +18,7 @@ const loading = (
 
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({ Rubik_500Medium, Rubik_700Bold, Rubik_800ExtraBold, Rubik_900Black });
+  const [playing, setPlaying] = useState(false);
   useEffect(() => {
     startAudio();
     loadLang();
@@ -27,7 +29,7 @@ export default function App() {
     <SafeAreaProvider>
       <StatusBar style="light" />
       <GameProvider fallback={loading}>
-        <GameScreen />
+        {playing ? <GameScreen /> : <TitleScreen onPlay={() => setPlaying(true)} />}
       </GameProvider>
     </SafeAreaProvider>
   );

@@ -57,6 +57,8 @@ export const ISLAND_IMAGES: Record<string, IslandImage> = {
   },
 };
 
+export const LOGO_IMAGE: ImageSourcePropType = require('../../assets/art/preview/logo.png');
+
 export const CAPTAIN_IMAGE: ImageSourcePropType = require('../../assets/art/preview/captain.png');
 
 export function buildingImage(themeKey: string, type: number, level: number): ImageSourcePropType | undefined {

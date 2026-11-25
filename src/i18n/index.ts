@@ -13,6 +13,7 @@ const bg = {
   } as Record<string, string>,
   islandN: (n: number) => `Остров ${n}`,
   buildingNames: ['Колиба', 'Къща', 'Мелница', 'Фар', 'Крепост'],
+  play: 'Играй',
   spinsLabel: 'Енергия',
   settings: {
     title: 'Настройки',
@@ -85,6 +86,7 @@ const en: Strings = {
   },
   islandN: (n) => `Island ${n}`,
   buildingNames: ['Hut', 'Cottage', 'Windmill', 'Lighthouse', 'Castle'],
+  play: 'Play',
   spinsLabel: 'Energy',
   settings: { title: 'Settings', sfx: 'Sound effects', music: 'Music', language: 'Language', on: 'On', off: 'Off' },
   meters: { sails: 'Sails', cannons: 'Cannons', rain: 'Rain' },
@@ -147,6 +149,7 @@ const ru: Strings = {
   },
   islandN: (n) => `Остров ${n}`,
   buildingNames: ['Хижина', 'Дом', 'Мельница', 'Маяк', 'Крепость'],
+  play: 'Играть',
   spinsLabel: 'Энергия',
   settings: { title: 'Настройки', sfx: 'Звуковые эффекты', music: 'Музыка', language: 'Язык', on: 'Вкл.', off: 'Выкл.' },
   meters: { sails: 'Паруса', cannons: 'Пушки', rain: 'Дождь' },
