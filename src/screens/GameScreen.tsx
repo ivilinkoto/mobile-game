@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,7 +12,7 @@ import { findLongestChain } from '../game/board';
 import { MAX_SPINS, MIN_CHAIN, REWARD, SPIN_REGEN_MS, chainValue } from '../game/config';
 import { canPlay, islandDef, islandScale, msUntilNextSpin } from '../game/engine';
 import type { ChainResult, TileKind } from '../game/types';
-import { formatCoins, formatDuration, t } from '../i18n';
+import { formatCoins, formatDuration, getLang, subscribeLang, t } from '../i18n';
 import { useGame } from '../state/GameProvider';
 import { GameButton } from '../ui/GameButton';
 import { GameText } from '../ui/GameText';
@@ -37,6 +37,8 @@ function resultLines(r: ChainResult): string[] {
 
 export function GameScreen() {
   const game = useGame();
+  // Re-render the whole screen when the language changes.
+  useSyncExternalStore(subscribeLang, getLang);
   const { state } = game;
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();

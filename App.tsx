@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Rubik_500Medium, Rubik_700Bold, Rubik_800ExtraBold, Rubik_900Black, useFonts } from '@expo-google-fonts/rubik';
 
 import { startAudio } from './src/audio/sound';
+import { loadLang } from './src/i18n';
 import { GameScreen } from './src/screens/GameScreen';
 import { GameProvider } from './src/state/GameProvider';
 
@@ -18,6 +19,7 @@ export default function App() {
   const [fontsLoaded, fontError] = useFonts({ Rubik_500Medium, Rubik_700Bold, Rubik_800ExtraBold, Rubik_900Black });
   useEffect(() => {
     startAudio();
+    loadLang();
   }, []);
   if (!fontsLoaded && !fontError) return loading;
 
