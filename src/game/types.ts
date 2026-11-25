@@ -2,17 +2,37 @@
 
 export type Rng = () => number;
 
+/** Icons used across the UI (wallet, rewards, popups). */
 export type SymbolId = 'coin' | 'bag' | 'anchor' | 'cannon' | 'map' | 'storm' | 'energy';
 
-export type OutcomeKind =
-  | 'mixed'
-  | 'coinTriple'
-  | 'bagTriple'
-  | 'anchorTriple'
-  | 'cannonTriple'
-  | 'mapTriple'
-  | 'energyTriple'
-  | 'stormTriple';
+/** Weather tiles the player chains together. */
+export type WeatherKind = 'sun' | 'wind' | 'bolt' | 'rain';
+/** 'storm' tiles are created by long chains and unleashed by tapping. */
+export type TileKind = WeatherKind | 'storm';
+
+export interface Tile {
+  /** Stable id so the UI can animate each tile as it falls. */
+  id: number;
+  kind: TileKind;
+}
+
+export interface Cell {
+  r: number;
+  c: number;
+}
+
+export interface Board {
+  /** tiles[row][col], row 0 at the top. */
+  tiles: Tile[][];
+  nextId: number;
+}
+
+/** Progress toward the actions that weather charges. */
+export interface Meters {
+  sails: number; // wind → raid a rival's treasure
+  cannons: number; // lightning → shell a rival's island
+  rain: number; // rain → a shield
+}
 
 export interface Rival {
   id: string;
@@ -26,15 +46,6 @@ export interface Rival {
   revenge: boolean;
 }
 
-export interface StormState {
-  /** Storm symbols collected toward the next front (0..STORM_CHARGE_NEEDED). */
-  charge: number;
-  /** A storm front is ready to be unleashed. */
-  ready: boolean;
-  /** Strength of the ready front (1..STORM_MAX_POWER). */
-  power: number;
-}
-
 export type PendingAction =
   | { type: 'attack'; targetIds: string[]; bet: number }
   | {
@@ -45,7 +56,7 @@ export type PendingAction =
       spots: number[];
       dug: number[];
     }
-  | { type: 'storm'; targetIds: string[] };
+  | { type: 'storm'; targetIds: string[]; power: number };
 
 export type LogEntry =
   | { kind: 'incomingAttack'; at: number; rivalName: string; blocked: boolean; buildingIndex: number | null }
@@ -59,40 +70,41 @@ export type LogEntry =
 export interface GameState {
   version: number;
   coins: number;
+  /** Energy: one chain costs one. */
   spins: number;
   /** Timestamp the regen clock last advanced from. */
   regenAnchor: number;
   shields: number;
-  bet: number;
   islandIndex: number;
   buildings: number[];
   damaged: boolean[];
-  storm: StormState;
+  board: Board;
+  meters: Meters;
   pending: PendingAction | null;
   rivals: Rival[];
   log: LogEntry[];
   /** Unread log entries (for the badge on the news button). */
   unread: number;
-  /** Index into the scripted tutorial outcomes; -1 when tutorial is done. */
-  tutorialStep: number;
   /** Set when an island was just completed, to show the celebration. */
   justCompletedIsland: number | null;
   lastSeenAt: number;
+  /** Chains played so far (drives the first-time hint). */
   totalSpins: number;
 }
 
-export interface SpinResult {
-  outcome: OutcomeKind;
-  symbols: [SymbolId, SymbolId, SymbolId];
+export interface ChainResult {
+  kind: WeatherKind;
+  length: number;
   coinsWon: number;
-  spinsWon: number;
+  /** How much each meter grew. */
+  sailsAdded: number;
+  cannonsAdded: number;
+  rainAdded: number;
   shieldWon: boolean;
-  /** Storm charge gained this spin. */
-  stormGained: number;
-  /** The held storm front grew stronger. */
-  stormPowerUp: boolean;
-  /** The held storm front turned back on the player. */
+  raidReady: boolean;
+  attackReady: boolean;
+  /** A long chain created a storm cloud on the board. */
+  stormSpawned: boolean;
+  /** Too many storm clouds — they turned on the player. */
   backfire: { buildingIndex: number | null } | null;
-  /** A brand new front formed this spin. */
-  stormFormed: boolean;
 }

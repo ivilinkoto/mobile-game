@@ -43,21 +43,30 @@ cropped, multiple objects, frame, border
 
 ---
 
-## 2. Символи на колелото (7 бр.) — `assets/art/symbols/`
+## 2. Облачета и икони — `assets/art/symbols/`
 
 Размер: **512×512**. Обектът е в центъра и заема ~80% от площта.
 
+### Облачета за небето (дъската) — най-важни
+Виждат се постоянно, по 36 наведнъж, и то малки (~55 px). Затова трябва да
+са **прости, с ясен силует и да се различават по цвят от пръв поглед**.
+
 | Файл | Какво е | Промпт |
 |---|---|---|
-| `coin.png` | Златна монета | `a single shiny gold coin with an embossed star, slightly tilted, game icon` |
-| `bag.png` | Торба със злато (джакпот) | `a bulging brown leather sack overflowing with gold coins, red rope tie, game icon` |
-| `shield.png` | Щит с котва | `a blue heraldic shield with a golden anchor emblem, gold rim, game icon` |
-| `cannon.png` | Оръдие | `a pirate ship cannon on a wooden carriage, black iron barrel with gold bands, small smoke puff, game icon` |
-| `map.png` | Карта на съкровище | `an old parchment treasure map with a dotted path and a red X, slightly curled edges, game icon` |
-| `storm.png` | Торнадо | `a swirling purple storm tornado with a small yellow lightning bolt, magical, game icon` |
-| `energy.png` | Енергия | `a glowing yellow lightning bolt inside a blue round orb, game icon` |
+| `tile_sun.png` | Слънце → монети | `a cheerful bright yellow sun with short rounded rays, game icon` |
+| `tile_wind.png` | Вятър → платна | `a small white fluffy cloud with mint-green swirling wind gusts, game icon` |
+| `tile_bolt.png` | Мълния → оръдия | `a small dark purple thundercloud with a bright yellow lightning bolt below it, game icon` |
+| `tile_rain.png` | Дъжд → щит | `a small light blue rain cloud with three blue raindrops falling, game icon` |
+| `tile_storm.png` | Буреносен облак | `a menacing deep violet storm cloud with swirling center and two yellow lightning bolts, magical glow, game icon` |
 
----
+### Икони за наградите и интерфейса
+| Файл | Какво е | Промпт |
+|---|---|---|
+| `coin.png` | Монета | `a single shiny gold coin with an embossed star, slightly tilted, game icon` |
+| `shield.png` | Щит | `a blue heraldic shield with a golden anchor emblem, gold rim, game icon` |
+| `cannon.png` | Оръдие | `a pirate ship cannon on a wooden carriage, black iron barrel with gold bands, game icon` |
+| `map.png` | Карта на съкровище | `an old parchment treasure map with a dotted path and a red X, slightly curled edges, game icon` |
+| `energy.png` | Енергия | `a glowing yellow lightning bolt inside a blue round orb, game icon` |
 
 ## 3. Сгради — `assets/art/buildings/<остров>/`
 
@@ -143,7 +152,6 @@ cropped, multiple objects, frame, border
 
 | Файл | Размер | Промпт / бележка |
 |---|---|---|
-| `wheel_frame.png` | 1024×512 | `ornate slot machine frame made of polished wood and gold, three empty square windows in a row, rivets, front view` |
 | `chest_closed.png` | 512×512 | `a closed wooden treasure chest with gold bands and lock, game icon` |
 | `chest_open.png` | 512×512 | `an open treasure chest overflowing with gold coins and gems, glowing, game icon` |
 | `dig_spot.png` | 512×512 | `a small mound of sand with a red X painted on it, top view, game icon` |
@@ -203,7 +211,7 @@ AI се справя зле с анимации. Вземи безплатен �
 
 | Група | Брой |
 |---|---|
-| Символи | 7 |
+| Облачета + икони | 10 |
 | Сгради (5 острова) | 75 + 1 |
 | Острови | 5 |
 | Герои | 3 + 10 |
@@ -211,6 +219,6 @@ AI се справя зле с анимации. Вземи безплатен �
 | Магазин | икона, банер, лого, начален екран |
 | **Общо** | **~115 картинки** |
 
-**Минимум за първо пускане:** символите (7), сградите и островът на
+**Минимум за първо пускане:** облачетата и иконите (10), сградите и островът на
 остров 1 (16 + 1), героите (13), интерфейсът (10) и магазинът.
 Това са около **50 картинки**. Островите 2–5 могат да излязат с обновления.

@@ -1,10 +1,12 @@
 /// <reference types="node" />
-// Economy simulator: plays a "greedy" bot that always spins at x1, resolves
-// attacks/raids/storms immediately and builds the cheapest thing it can.
-// Prints how many spins (and hours of free regen) each island takes.
+// Economy simulator: a bot plays the sky board (always taking a long chain
+// it can find), resolves attacks/raids immediately, unleashes storms at
+// power 2 and builds the cheapest thing it can afford.
+// Prints how many moves (and hours of free energy) each island takes.
 //
 //   npm run balance
 
+import { findLongestChain } from '../src/game/board.ts';
 import { MAX_BUILDING_LEVEL, REWARD, SPIN_REGEN_MS } from '../src/game/config.ts';
 import {
   attack,
@@ -13,28 +15,33 @@ import {
   createInitialState,
   dig,
   nextBuildCost,
+  playChain,
   prepareStorm,
   repair,
   repairCost,
-  spin,
+  stormPower,
   unleashStorm,
 } from '../src/game/engine.ts';
 import { seededRng } from '../src/game/rng.ts';
 import type { GameState } from '../src/game/types.ts';
 
 const ISLANDS = 5;
-const RUNS = 200;
+const RUNS = 60;
 
 const totals: number[] = Array(ISLANDS).fill(0);
+const lengths: number[] = [];
 for (let run = 0; run < RUNS; run++) {
   const rng = seededRng(run + 1);
   let s: GameState = createInitialState(0, rng);
-  let spinsUsed = 0;
+  let moves = 0;
   let lastIslandAt = 0;
-  while (s.islandIndex < ISLANDS && spinsUsed < 100_000) {
+  while (s.islandIndex < ISLANDS && moves < 20_000) {
     s = { ...s, spins: 50, justCompletedIsland: null };
-    const r = spin(s, rng, 0)!;
-    spinsUsed++;
+    // a casual player: usually a medium chain, sometimes the longest one
+    const path = findLongestChain(s.board, rng() < 0.3 ? 8 : 4);
+    lengths.push(path.length);
+    const r = playChain(s, path, rng, 0)!;
+    moves++;
     s = r.state;
     if (s.pending?.type === 'attack') {
       const id = s.pending.targetIds[0];
@@ -44,11 +51,10 @@ for (let run = 0; run < RUNS; run++) {
       for (let d = 0; d < REWARD.raidDigs; d++) s = dig(s, d, 0)!.state;
       s = closeRaid(s);
     }
-    if (s.storm.ready && s.storm.power >= 2) {
+    if (stormPower(s) >= 2) {
       s = prepareStorm(s, rng);
       s = unleashStorm(s, (s.pending as { targetIds: string[] }).targetIds[0], rng, 0)!.state;
     }
-    // spend coins: repairs first, then cheapest upgrade
     for (;;) {
       const island = s.islandIndex;
       const dmg = s.damaged.findIndex(Boolean);
@@ -69,14 +75,16 @@ for (let run = 0; run < RUNS; run++) {
         s = build(s, best, 0)!;
       }
       if (s.islandIndex !== island) {
-        if (island < ISLANDS) totals[island] += spinsUsed - lastIslandAt;
-        lastIslandAt = spinsUsed;
+        if (island < ISLANDS) totals[island] += moves - lastIslandAt;
+        lastIslandAt = moves;
       }
     }
   }
 }
 
-console.log('Island | avg spins | hours of free regen');
+const avgLen = lengths.reduce((a, b) => a + b, 0) / lengths.length;
+console.log(`average chain length: ${avgLen.toFixed(1)}`);
+console.log('Island | avg moves | hours of free energy');
 for (let i = 0; i < ISLANDS; i++) {
   const avg = totals[i] / RUNS;
   console.log(`${String(i + 1).padStart(6)} | ${avg.toFixed(0).padStart(9)} | ${((avg * SPIN_REGEN_MS) / 3_600_000).toFixed(1)}`);

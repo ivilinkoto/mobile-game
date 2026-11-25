@@ -4,19 +4,13 @@ import { AppState } from 'react-native';
 
 import * as E from '../game/engine';
 import { mathRng } from '../game/rng';
-import type { GameState, SpinResult } from '../game/types';
+import type { Cell, ChainResult, GameState } from '../game/types';
 
 const SAVE_KEY = 'storm-isles/save';
 
-export interface SpinTicket {
-  result: SpinResult;
-  /** Apply the spin's state once the reel animation has finished. */
-  commit: () => void;
-}
-
 export interface GameActions {
-  spin: () => SpinTicket | null;
-  cycleBet: () => void;
+  /** Play a chain on the sky board; null when it is not allowed. */
+  playChain: (path: Cell[]) => ChainResult | null;
   build: (b: number) => boolean;
   repair: (b: number) => boolean;
   attack: (rivalId: string, building: number) => { coins: number; blocked: boolean } | null;
@@ -62,17 +56,11 @@ function createGameStore() {
   const wrap = (s: GameState | null) => (s ? { state: s, value: true } : null);
 
   const actions: GameActions = {
-    spin: () => {
-      if (!state) return null;
-      const before = state;
-      const out = E.spin(before, mathRng, Date.now());
-      if (!out) return null;
-      // Deduct the spin right away so a double tap can't spin twice;
-      // the full result is committed when the reels stop.
-      set({ ...before, spins: before.spins - before.bet });
-      return { result: out.result, commit: () => set(out.state) };
-    },
-    cycleBet: () => just(E.cycleBet),
+    playChain: (path) =>
+      run((s) => {
+        const r = E.playChain(s, path, mathRng, Date.now());
+        return r ? { state: r.state, value: r.result } : null;
+      }),
     build: (b) => !!run((s) => wrap(E.build(s, b, Date.now()))),
     repair: (b) => !!run((s) => wrap(E.repair(s, b, Date.now()))),
     attack: (id, b) =>

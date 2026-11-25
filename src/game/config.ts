@@ -1,63 +1,54 @@
 // Game balance lives here. Tweak numbers, then run `npm run balance`
-// to see how many spins each island takes.
+// to see how many moves each island takes.
 
-import type { OutcomeKind, SymbolId } from './types.ts';
+import type { WeatherKind } from './types.ts';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
-// ── Energy (spins) ────────────────────────────────────────────────
+// ── Energy (one chain = one energy) ──────────────────────────────
 export const MAX_SPINS = 50;
 export const START_SPINS = 50;
-export const SPIN_REGEN_MS = 10 * 60 * 1000; // 1 spin every 10 minutes
+export const SPIN_REGEN_MS = 10 * 60 * 1000; // 1 energy every 10 minutes
 
 // ── Wallet / shields ──────────────────────────────────────────────
 export const START_COINS = 1000;
 export const MAX_SHIELDS = 3;
 export const START_SHIELDS = 1;
 
-/** Bet multipliers; a bet is only allowed when you have at least that many spins. */
-export const BETS = [1, 2, 3, 5, 10];
+// ── Sky board ────────────────────────────────────────────────────
+export const BOARD_COLS = 6;
+export const BOARD_ROWS = 6;
+export const MIN_CHAIN = 3;
 
-// ── Wheel ─────────────────────────────────────────────────────────
-/** Weight of each outcome per spin (sum does not need to be 100). */
-export const OUTCOME_WEIGHTS: Record<OutcomeKind, number> = {
-  mixed: 47,
-  coinTriple: 14,
-  bagTriple: 4,
-  anchorTriple: 9,
-  cannonTriple: 11,
-  mapTriple: 7,
-  energyTriple: 5,
-  stormTriple: 3,
+/** How often each weather appears when the sky refills. */
+export const TILE_WEIGHTS: Record<WeatherKind, number> = {
+  sun: 30,
+  wind: 25,
+  bolt: 23,
+  rain: 22,
 };
 
-/** Per-reel symbol weights used for 'mixed' spins (never a triple). */
-export const MIXED_SYMBOL_WEIGHTS: Record<SymbolId, number> = {
-  coin: 35,
-  storm: 12,
-  anchor: 12,
-  cannon: 12,
-  map: 10,
-  bag: 9,
-  energy: 10,
+/** Meter sizes: filling one triggers its action. */
+export const METER_MAX = {
+  sails: 12, // wind  → raid a treasure
+  cannons: 10, // bolt → attack an island
+  rain: 9, // rain → +1 shield
 };
 
-/** Scripted first spins so a new player sees every mechanic quickly. */
-export const TUTORIAL_OUTCOMES: OutcomeKind[] = [
-  'coinTriple',
-  'coinTriple',
-  'cannonTriple',
-  'mapTriple',
-  'anchorTriple',
-];
+/**
+ * Long chains are worth more than the sum of their tiles:
+ * value = length + bonus, bonus = (length - 3) * 0.5 (rounded down).
+ */
+export function chainValue(length: number): number {
+  return length + Math.floor(Math.max(0, length - 3) * 0.5);
+}
 
-// ── Rewards (multiplied by islandScale and bet) ───────────────────
+// ── Rewards (multiplied by islandScale) ──────────────────────────
 export const REWARD = {
-  coinPerSymbol: 50,
-  coinTriple: 600,
-  bagTriple: 2500,
-  anchorOverflow: 300, // when shields are already full
-  energyTriple: 10, // spins (× bet, not × island scale)
+  /** Coins per point of chain value for sunshine. */
+  sunCoin: 55,
+  /** Coins instead of a shield when shields are already full. */
+  rainOverflow: 250,
   attack: 1500,
   attackBlockedFactor: 0.3,
   revengeFactor: 1.5,
@@ -65,17 +56,17 @@ export const REWARD = {
   /** Value multipliers of the 4 raid spots (shuffled). Player digs 3. */
   raidSpots: [1.0, 0.3, 0.2, 0.1],
   raidDigs: 3,
-  storm: 2000, // × 2^(power-1)
+  storm: 1800, // × 2^(power-1)
   islandCompleteSpins: 20,
 };
 
 export const REWARD_SCALE_GROWTH = 1.6;
 
-// ── Storm front ──────────────────────────────────────────────────
-export const STORM_CHARGE_NEEDED = 3;
-export const STORM_MAX_POWER = 4;
-/** While holding a front, this many storm symbols in one spin make it backfire. */
-export const STORM_BACKFIRE_SYMBOLS = 2;
+// ── Storm clouds ─────────────────────────────────────────────────
+/** A chain at least this long leaves a storm cloud on the board. */
+export const STORM_CHAIN = 6;
+/** This many storm clouds on the board at once and they hit your own island. */
+export const STORM_BACKFIRE = 4;
 
 // ── Islands ──────────────────────────────────────────────────────
 export const BUILDINGS_PER_ISLAND = 5;

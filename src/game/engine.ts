@@ -1,8 +1,8 @@
 // Pure game rules. Every function takes a state and returns a new state —
 // no React, no storage, no Math.random (randomness is injected as `rng`).
 
+import { clearKind, collapse, countKind, createBoard, isValidChain } from './board.ts';
 import {
-  BETS,
   BUILDINGS_PER_ISLAND,
   INCOMING,
   ISLANDS,
@@ -12,8 +12,7 @@ import {
   MAX_BUILDING_LEVEL,
   MAX_SHIELDS,
   MAX_SPINS,
-  MIXED_SYMBOL_WEIGHTS,
-  OUTCOME_WEIGHTS,
+  METER_MAX,
   REPAIR_FACTOR,
   REWARD,
   REWARD_SCALE_GROWTH,
@@ -24,21 +23,12 @@ import {
   START_COINS,
   START_SHIELDS,
   START_SPINS,
-  STORM_BACKFIRE_SYMBOLS,
-  STORM_CHARGE_NEEDED,
-  STORM_MAX_POWER,
-  TUTORIAL_OUTCOMES,
+  STORM_BACKFIRE,
+  STORM_CHAIN,
+  chainValue,
 } from './config.ts';
-import { pickWeighted, randInt, shuffle } from './rng.ts';
-import type {
-  GameState,
-  LogEntry,
-  OutcomeKind,
-  Rival,
-  Rng,
-  SpinResult,
-  SymbolId,
-} from './types.ts';
+import { randInt, shuffle } from './rng.ts';
+import type { Cell, ChainResult, GameState, LogEntry, Rival, Rng, WeatherKind } from './types.ts';
 
 // ── Helpers ───────────────────────────────────────────────────────
 
@@ -154,16 +144,15 @@ export function createInitialState(now: number, rng: Rng): GameState {
     spins: START_SPINS,
     regenAnchor: now,
     shields: START_SHIELDS,
-    bet: 1,
     islandIndex: 0,
     buildings: Array(BUILDINGS_PER_ISLAND).fill(0),
     damaged: Array(BUILDINGS_PER_ISLAND).fill(false),
-    storm: { charge: 0, ready: false, power: 0 },
+    board: createBoard(rng),
+    meters: { sails: 0, cannons: 0, rain: 0 },
     pending: null,
     rivals: Array.from({ length: RIVAL_COUNT }, (_, i) => makeRival(i, 0, rng)),
     log: [],
     unread: 0,
-    tutorialStep: 0,
     justCompletedIsland: null,
     lastSeenAt: now,
     totalSpins: 0,
@@ -186,17 +175,6 @@ export function regenSpins(state: GameState, now: number): GameState {
 export function msUntilNextSpin(state: GameState, now: number): number | null {
   if (state.spins >= MAX_SPINS) return null;
   return Math.max(0, state.regenAnchor + SPIN_REGEN_MS - now);
-}
-
-/** Bets the player can currently afford. */
-export function availableBets(state: GameState): number[] {
-  return BETS.filter((b) => b === 1 || state.spins >= b);
-}
-
-export function cycleBet(state: GameState): GameState {
-  const bets = availableBets(state);
-  const idx = bets.indexOf(state.bet);
-  return { ...state, bet: bets[(idx + 1) % bets.length] };
 }
 
 /**
@@ -245,138 +223,103 @@ export function touch(state: GameState, now: number): GameState {
   return { ...state, lastSeenAt: now };
 }
 
-// ── Spinning ─────────────────────────────────────────────────────
+// ── Playing a chain ──────────────────────────────────────────────
 
-const TRIPLE_SYMBOL: Record<Exclude<OutcomeKind, 'mixed'>, SymbolId> = {
-  coinTriple: 'coin',
-  bagTriple: 'bag',
-  anchorTriple: 'anchor',
-  cannonTriple: 'cannon',
-  mapTriple: 'map',
-  energyTriple: 'energy',
-  stormTriple: 'storm',
-};
-
-function rollSymbols(outcome: OutcomeKind, rng: Rng): [SymbolId, SymbolId, SymbolId] {
-  if (outcome !== 'mixed') {
-    const s = TRIPLE_SYMBOL[outcome];
-    return [s, s, s];
-  }
-  for (;;) {
-    const a = pickWeighted(MIXED_SYMBOL_WEIGHTS, rng);
-    const b = pickWeighted(MIXED_SYMBOL_WEIGHTS, rng);
-    const c = pickWeighted(MIXED_SYMBOL_WEIGHTS, rng);
-    if (!(a === b && b === c)) return [a, b, c];
-  }
+export function canPlay(state: GameState): boolean {
+  return state.pending === null && state.spins >= 1 && state.justCompletedIsland === null;
 }
 
-export function canSpin(state: GameState): boolean {
-  return state.pending === null && state.spins >= state.bet && state.justCompletedIsland === null;
-}
-
-export function spin(state: GameState, rng: Rng, now: number): { state: GameState; result: SpinResult } | null {
+/**
+ * Collect a chain of same-weather tiles. Costs one energy.
+ * Sun pays coins; wind, lightning and rain fill their meters, and a full
+ * meter opens its action (raid, attack, shield). Long chains leave a storm
+ * cloud behind — but too many storm clouds turn on the player.
+ */
+export function playChain(state: GameState, path: Cell[], rng: Rng, now: number): { state: GameState; result: ChainResult } | null {
   let s = regenSpins(state, now);
-  if (!canSpin(s)) return null;
+  if (!canPlay(s) || !isValidChain(s.board, path)) return null;
 
-  const bet = s.bet;
-  const wasFull = s.spins >= MAX_SPINS;
-  s = { ...s, spins: s.spins - bet, totalSpins: s.totalSpins + 1, lastSeenAt: now };
-  if (wasFull && s.spins < MAX_SPINS) s.regenAnchor = now;
-
-  let outcome: OutcomeKind;
-  if (s.tutorialStep >= 0 && s.tutorialStep < TUTORIAL_OUTCOMES.length) {
-    outcome = TUTORIAL_OUTCOMES[s.tutorialStep];
-    s.tutorialStep = s.tutorialStep + 1 >= TUTORIAL_OUTCOMES.length ? -1 : s.tutorialStep + 1;
-  } else {
-    outcome = pickWeighted(OUTCOME_WEIGHTS, rng);
-  }
-  const symbols = rollSymbols(outcome, rng);
+  const kind = s.board.tiles[path[0].r][path[0].c].kind as WeatherKind;
+  const value = chainValue(path.length);
   const scale = islandScale(s.islandIndex);
+  const wasFull = s.spins >= MAX_SPINS;
+  s = { ...s, spins: s.spins - 1, totalSpins: s.totalSpins + 1, lastSeenAt: now, meters: { ...s.meters } };
+  if (wasFull) s.regenAnchor = now;
 
-  const result: SpinResult = {
-    outcome,
-    symbols,
+  const result: ChainResult = {
+    kind,
+    length: path.length,
     coinsWon: 0,
-    spinsWon: 0,
+    sailsAdded: 0,
+    cannonsAdded: 0,
+    rainAdded: 0,
     shieldWon: false,
-    stormGained: 0,
-    stormPowerUp: false,
+    raidReady: false,
+    attackReady: false,
+    stormSpawned: false,
     backfire: null,
-    stormFormed: false,
   };
 
-  switch (outcome) {
-    case 'mixed': {
-      const coinsShown = symbols.filter((x) => x === 'coin').length;
-      result.coinsWon = Math.round(REWARD.coinPerSymbol * coinsShown * scale * bet);
+  switch (kind) {
+    case 'sun':
+      result.coinsWon = Math.round(REWARD.sunCoin * value * scale);
       break;
-    }
-    case 'coinTriple':
-      result.coinsWon = Math.round(REWARD.coinTriple * scale * bet);
-      break;
-    case 'bagTriple':
-      result.coinsWon = Math.round(REWARD.bagTriple * scale * bet);
-      break;
-    case 'anchorTriple':
-      if (s.shields < MAX_SHIELDS) {
-        s.shields += 1;
-        result.shieldWon = true;
-      } else {
-        result.coinsWon = Math.round(REWARD.anchorOverflow * scale * bet);
+    case 'wind':
+      result.sailsAdded = value;
+      s.meters.sails += value;
+      if (s.meters.sails >= METER_MAX.sails) {
+        s.meters.sails -= METER_MAX.sails;
+        const rival = s.rivals[randInt(0, s.rivals.length - 1, rng)];
+        const base = REWARD.raidBase * scale;
+        s.pending = {
+          type: 'raid',
+          rivalId: rival.id,
+          bet: 1,
+          spots: shuffle(REWARD.raidSpots, rng).map((m) => Math.round(base * m)),
+          dug: [],
+        };
+        result.raidReady = true;
       }
       break;
-    case 'energyTriple':
-      result.spinsWon = REWARD.energyTriple * bet;
+    case 'bolt':
+      result.cannonsAdded = value;
+      s.meters.cannons += value;
+      if (s.meters.cannons >= METER_MAX.cannons) {
+        s.meters.cannons -= METER_MAX.cannons;
+        s.pending = { type: 'attack', targetIds: pickTargets(s.rivals, 3, rng), bet: 1 };
+        result.attackReady = true;
+      }
       break;
-    case 'cannonTriple':
-      s.pending = { type: 'attack', targetIds: pickTargets(s.rivals, 3, rng), bet };
-      break;
-    case 'mapTriple': {
-      const rival = s.rivals[randInt(0, s.rivals.length - 1, rng)];
-      const base = REWARD.raidBase * scale * bet;
-      s.pending = {
-        type: 'raid',
-        rivalId: rival.id,
-        bet,
-        spots: shuffle(REWARD.raidSpots, rng).map((m) => Math.round(base * m)),
-        dug: [],
-      };
-      break;
-    }
-    case 'stormTriple':
+    case 'rain':
+      result.rainAdded = value;
+      s.meters.rain += value;
+      while (s.meters.rain >= METER_MAX.rain) {
+        s.meters.rain -= METER_MAX.rain;
+        if (s.shields < MAX_SHIELDS) {
+          s.shields += 1;
+          result.shieldWon = true;
+        } else {
+          result.coinsWon += Math.round(REWARD.rainOverflow * scale);
+        }
+      }
       break;
   }
-
   s.coins += result.coinsWon;
-  s.spins += result.spinsWon;
 
-  // Storm front: collect, strengthen, or backfire.
-  const stormSymbols = symbols.filter((x) => x === 'storm').length;
-  if (stormSymbols > 0) {
-    if (s.storm.ready) {
-      if (stormSymbols >= STORM_BACKFIRE_SYMBOLS) {
-        const b = randomDamageTarget(s.buildings, s.damaged, rng);
-        if (b !== null) {
-          s.damaged = s.damaged.slice();
-          s.damaged[b] = true;
-        }
-        s.storm = { charge: 0, ready: false, power: 0 };
-        result.backfire = { buildingIndex: b };
-        s = pushLog(s, { kind: 'backfire', at: now, buildingIndex: b });
-      } else if (s.storm.power < STORM_MAX_POWER) {
-        s.storm = { ...s.storm, power: s.storm.power + 1 };
-        result.stormPowerUp = true;
-      }
-    } else {
-      const charge = s.storm.charge + stormSymbols;
-      result.stormGained = stormSymbols;
-      if (charge >= STORM_CHARGE_NEEDED) {
-        s.storm = { charge: 0, ready: true, power: 1 };
-        result.stormFormed = true;
-      } else {
-        s.storm = { ...s.storm, charge };
-      }
+  // Remove the chain; a long chain leaves a storm cloud where it ended.
+  const spawn = path.length >= STORM_CHAIN ? { cell: path[path.length - 1], kind: 'storm' as const } : undefined;
+  s.board = collapse(s.board, path, rng, spawn);
+  result.stormSpawned = !!spawn;
+
+  if (spawn && countKind(s.board, 'storm') >= STORM_BACKFIRE) {
+    const b = randomDamageTarget(s.buildings, s.damaged, rng);
+    if (b !== null) {
+      s.damaged = s.damaged.slice();
+      s.damaged[b] = true;
     }
+    s.board = clearKind(s.board, 'storm', rng);
+    result.backfire = { buildingIndex: b };
+    s = pushLog(s, { kind: 'backfire', at: now, buildingIndex: b });
   }
 
   return { state: s, result };
@@ -451,22 +394,29 @@ export function closeRaid(state: GameState): GameState {
   return { ...state, pending: null };
 }
 
-// ── Storm front ──────────────────────────────────────────────────
+// ── Storm clouds ─────────────────────────────────────────────────
 
-export function stormReward(state: GameState): number {
-  return Math.round(REWARD.storm * islandScale(state.islandIndex) * Math.pow(2, Math.max(0, state.storm.power - 1)));
+/** Storm power = storm clouds currently on the board. */
+export function stormPower(state: GameState): number {
+  return countKind(state.board, 'storm');
 }
 
+export function stormReward(state: GameState, power = stormPower(state)): number {
+  return Math.round(REWARD.storm * islandScale(state.islandIndex) * Math.pow(2, Math.max(0, power - 1)));
+}
+
+/** Tapping a storm cloud: pick a rival to send the storm to. */
 export function prepareStorm(state: GameState, rng: Rng): GameState {
-  if (!state.storm.ready || state.pending) return state;
-  return { ...state, pending: { type: 'storm', targetIds: pickTargets(state.rivals, 3, rng) } };
+  const power = stormPower(state);
+  if (power === 0 || state.pending) return state;
+  return { ...state, pending: { type: 'storm', targetIds: pickTargets(state.rivals, 3, rng), power } };
 }
 
 export function cancelStorm(state: GameState): GameState {
   return state.pending?.type === 'storm' ? { ...state, pending: null } : state;
 }
 
-/** Storms ignore shields: they always damage a building. */
+/** Storms ignore shields: they always damage a building. All storm clouds are used up. */
 export function unleashStorm(
   state: GameState,
   rivalId: string,
@@ -474,10 +424,12 @@ export function unleashStorm(
   now: number,
 ): { state: GameState; coins: number } | null {
   const p = state.pending;
-  if (!p || p.type !== 'storm' || !p.targetIds.includes(rivalId) || !state.storm.ready) return null;
+  if (!p || p.type !== 'storm' || !p.targetIds.includes(rivalId)) return null;
+  const power = stormPower(state);
+  if (power === 0) return null;
   const idx = state.rivals.findIndex((r) => r.id === rivalId);
   const rival = state.rivals[idx];
-  let coins = stormReward(state);
+  let coins = stormReward(state, power);
   if (rival.revenge) coins = Math.round(coins * REWARD.revengeFactor);
 
   const updated: Rival = { ...rival, damaged: rival.damaged.slice(), revenge: false };
@@ -487,8 +439,8 @@ export function unleashStorm(
   const rivals = state.rivals.slice();
   rivals[idx] = updated;
   const s = pushLog(
-    { ...state, rivals, coins: state.coins + coins, pending: null, storm: { charge: 0, ready: false, power: 0 } },
-    { kind: 'storm', at: now, rivalName: rival.name, coins, power: state.storm.power },
+    { ...state, rivals, coins: state.coins + coins, pending: null, board: clearKind(state.board, 'storm', rng) },
+    { kind: 'storm', at: now, rivalName: rival.name, coins, power },
   );
   return { state: s, coins };
 }

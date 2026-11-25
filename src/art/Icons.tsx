@@ -4,7 +4,7 @@ import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, RadialGradient, Re
 
 import { Image } from 'react-native';
 
-import type { SymbolId } from '../game/types';
+import type { SymbolId, TileKind } from '../game/types';
 import { SYMBOL_IMAGES } from './images';
 import { useUid } from './useUid';
 
@@ -306,5 +306,145 @@ export function SymbolIcon({ id, size }: { id: SymbolId; size: number }) {
       return <StormIcon size={size} />;
     case 'energy':
       return <EnergyIcon size={size} />;
+  }
+}
+
+// ── Weather tiles for the sky board ──────────────────────────────
+
+function Cloud({ fill, stroke, y = 0 }: { fill: string; stroke: string; y?: number }) {
+  return (
+    <Path
+      d={`M20 ${62 + y} Q8 ${62 + y} 10 ${50 + y} Q12 ${38 + y} 26 ${40 + y} Q28 ${22 + y} 48 ${24 + y} Q62 ${14 + y} 72 ${30 + y} Q90 ${30 + y} 90 ${46 + y} Q92 ${62 + y} 78 ${62 + y} Z`}
+      fill={fill}
+      stroke={stroke}
+      strokeWidth="4"
+      strokeLinejoin="round"
+    />
+  );
+}
+
+export function SunIcon({ size }: IconProps) {
+  const id = useUid('sun');
+  return (
+    <Svg width={size} height={size} viewBox="0 0 100 100">
+      <Defs>
+        <RadialGradient id={`${id}a`} cx="40%" cy="35%" r="70%">
+          <Stop offset="0" stopColor="#fff7b0" />
+          <Stop offset="0.5" stopColor="#ffd23f" />
+          <Stop offset="1" stopColor="#ff9f1c" />
+        </RadialGradient>
+      </Defs>
+      {Array.from({ length: 8 }, (_, i) => (
+        <Path
+          key={i}
+          d="M50 4 L57 20 L43 20 Z"
+          fill="#ffb02e"
+          stroke={OUTLINE}
+          strokeWidth="3"
+          strokeLinejoin="round"
+          transform={`rotate(${i * 45} 50 50)`}
+        />
+      ))}
+      <Circle cx="50" cy="50" r="28" fill={`url(#${id}a)`} stroke={OUTLINE} strokeWidth="4" />
+      <Path d="M34 40 Q40 28 52 26" stroke="#fff" strokeWidth="5" strokeLinecap="round" fill="none" opacity="0.8" />
+    </Svg>
+  );
+}
+
+export function WindIcon({ size }: IconProps) {
+  const id = useUid('wind');
+  return (
+    <Svg width={size} height={size} viewBox="0 0 100 100">
+      <Defs>
+        <LinearGradient id={`${id}a`} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#ffffff" />
+          <Stop offset="1" stopColor="#bfeee6" />
+        </LinearGradient>
+      </Defs>
+      <Cloud fill={`url(#${id}a)`} stroke={OUTLINE} y={-6} />
+      <G stroke="#1aa39a" strokeWidth="6" strokeLinecap="round" fill="none">
+        <Path d="M14 72 L60 72 Q74 72 72 62 Q70 54 62 56" />
+        <Path d="M24 86 L76 86 Q90 86 88 76" />
+      </G>
+    </Svg>
+  );
+}
+
+export function BoltIcon({ size }: IconProps) {
+  const id = useUid('bolt');
+  return (
+    <Svg width={size} height={size} viewBox="0 0 100 100">
+      <Defs>
+        <LinearGradient id={`${id}a`} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#8d86a8" />
+          <Stop offset="1" stopColor="#4b4466" />
+        </LinearGradient>
+        <LinearGradient id={`${id}b`} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#fff38a" />
+          <Stop offset="1" stopColor="#ffb02e" />
+        </LinearGradient>
+      </Defs>
+      <Path d="M52 46 L34 74 L48 74 L40 96 L68 62 L54 62 L62 46 Z" fill={`url(#${id}b)`} stroke={OUTLINE} strokeWidth="4" strokeLinejoin="round" />
+      <Cloud fill={`url(#${id}a)`} stroke={OUTLINE} y={-10} />
+      <Path d="M26 34 Q34 22 48 22" stroke="#fff" strokeWidth="4" strokeLinecap="round" fill="none" opacity="0.5" />
+    </Svg>
+  );
+}
+
+export function RainIcon({ size }: IconProps) {
+  const id = useUid('rain');
+  return (
+    <Svg width={size} height={size} viewBox="0 0 100 100">
+      <Defs>
+        <LinearGradient id={`${id}a`} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#d9f1ff" />
+          <Stop offset="1" stopColor="#7cc4f2" />
+        </LinearGradient>
+      </Defs>
+      <Cloud fill={`url(#${id}a)`} stroke={OUTLINE} y={-10} />
+      {[28, 50, 72].map((x, i) => (
+        <Path
+          key={x}
+          d={`M${x} ${66 + (i % 2) * 8} Q${x - 7} ${78 + (i % 2) * 8} ${x} ${84 + (i % 2) * 8} Q${x + 7} ${78 + (i % 2) * 8} ${x} ${66 + (i % 2) * 8} Z`}
+          fill="#2a86e0"
+          stroke={OUTLINE}
+          strokeWidth="3"
+          strokeLinejoin="round"
+        />
+      ))}
+    </Svg>
+  );
+}
+
+export function StormCloudIcon({ size }: IconProps) {
+  const id = useUid('scl');
+  return (
+    <Svg width={size} height={size} viewBox="0 0 100 100">
+      <Defs>
+        <RadialGradient id={`${id}a`} cx="50%" cy="40%" r="70%">
+          <Stop offset="0" stopColor="#9b7bff" />
+          <Stop offset="1" stopColor="#3b1f99" />
+        </RadialGradient>
+      </Defs>
+      <Path d="M30 54 L20 76 L30 76 L24 94 L44 68 L34 68 L40 54 Z" fill="#ffd84d" stroke={OUTLINE} strokeWidth="3" strokeLinejoin="round" />
+      <Path d="M66 54 L58 72 L68 72 L62 90 L80 66 L70 66 L74 54 Z" fill="#ffd84d" stroke={OUTLINE} strokeWidth="3" strokeLinejoin="round" />
+      <Cloud fill={`url(#${id}a)`} stroke={OUTLINE} y={-6} />
+      <Path d="M34 38 Q46 30 58 36 Q66 42 60 48 Q52 52 48 44" stroke="#e2d6ff" strokeWidth="4" fill="none" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function TileIcon({ kind, size }: { kind: TileKind; size: number }) {
+  switch (kind) {
+    case 'sun':
+      return <SunIcon size={size} />;
+    case 'wind':
+      return <WindIcon size={size} />;
+    case 'bolt':
+      return <BoltIcon size={size} />;
+    case 'rain':
+      return <RainIcon size={size} />;
+    case 'storm':
+      return <StormCloudIcon size={size} />;
   }
 }
