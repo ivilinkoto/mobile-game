@@ -448,3 +448,27 @@ export function TileIcon({ kind, size }: { kind: TileKind; size: number }) {
       return <StormCloudIcon size={size} />;
   }
 }
+
+export function GearIcon({ size }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 100 100">
+      {Array.from({ length: 8 }, (_, i) => (
+        <Rect
+          key={i}
+          x="42"
+          y="6"
+          width="16"
+          height="22"
+          rx="4"
+          fill="#d9dde3"
+          stroke={OUTLINE}
+          strokeWidth="4"
+          transform={`rotate(${i * 45} 50 50)`}
+        />
+      ))}
+      <Circle cx="50" cy="50" r="30" fill="#d9dde3" stroke={OUTLINE} strokeWidth="5" />
+      <Circle cx="50" cy="50" r="12" fill="#7a4a1f" stroke={OUTLINE} strokeWidth="4" />
+      <Path d="M30 40 Q36 28 50 26" stroke="#fff" strokeWidth="5" strokeLinecap="round" fill="none" opacity="0.8" />
+    </Svg>
+  );
+}

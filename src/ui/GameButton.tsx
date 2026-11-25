@@ -3,6 +3,7 @@ import { Animated, Pressable, StyleSheet, View, type StyleProp, type ViewStyle }
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 
+import { sfx } from '../audio/sound';
 import { GameText } from './GameText';
 
 type Variant = 'gold' | 'green' | 'storm' | 'wood' | 'danger' | 'blue';
@@ -45,6 +46,7 @@ export function GameButton({ label, children, onPress, variant = 'gold', disable
         onPressOut={() => to(1)}
         onPress={() => {
           Haptics.selectionAsync().catch(() => {});
+          sfx('tap', 0.6);
           onPress();
         }}
         style={[styles.outer, { borderRadius: radius + 3, backgroundColor: p.edge, opacity: disabled ? 0.6 : 1 }]}

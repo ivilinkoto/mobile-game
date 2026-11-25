@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
+import { sfx } from '../audio/sound';
 import { EnergyIcon, HammerIcon } from '../art/Icons';
 import { IslandScene } from '../art/IslandScene';
 import { themeFor } from '../art/themes';
@@ -19,6 +20,7 @@ import { BuildSheet } from '../components/BuildSheet';
 import { Hud } from '../components/Hud';
 import { IslandCompleteSheet, NewsSheet } from '../components/InfoSheets';
 import { Meters } from '../components/Meters';
+import { SettingsSheet } from '../components/SettingsSheet';
 import { SkyBoard } from '../components/SkyBoard';
 import { AttackSheet, RaidSheet, StormSheet } from '../components/TargetSheets';
 import { CoinBurst, Toast, type ToastData } from '../components/Toast';
@@ -42,6 +44,7 @@ export function GameScreen() {
   const [burst, setBurst] = useState(0);
   const [busy, setBusy] = useState(false);
   const [showBuild, setShowBuild] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   // Open the news right away when the player returns to unread attacks.
   const [showNews, setShowNews] = useState(
     () => state.unread > 0 && !!state.log[0] && state.log[0].kind.startsWith('incoming'),
@@ -71,6 +74,12 @@ export function GameScreen() {
     setBusy(true);
     Haptics.impactAsync(path.length >= 6 ? Haptics.ImpactFeedbackStyle.Heavy : Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     reward(r.coinsWon, resultLines(r));
+    sfx('collect');
+    if (r.kind === 'sun' && r.coinsWon > 0) setTimeout(() => sfx('coins', 0.7), 120);
+    if (r.raidReady || r.attackReady) setTimeout(() => sfx('meter_full'), 200);
+    if (r.shieldWon) setTimeout(() => sfx('shield'), 200);
+    if (r.backfire) setTimeout(() => sfx('backfire'), 150);
+    else if (r.stormSpawned) setTimeout(() => sfx('storm_spawn'), 150);
   };
 
   const preview = (kind: TileKind, length: number) => {
@@ -107,6 +116,7 @@ export function GameScreen() {
               setShowNews(true);
               game.markLogRead();
             }}
+            onOpenSettings={() => setShowSettings(true)}
           />
         </SafeAreaView>
         <View style={styles.islandFooter} pointerEvents="box-none">
@@ -170,6 +180,7 @@ export function GameScreen() {
       <CoinBurst key={burst} id={burst} from={{ x: width / 2, y: height * 0.68 }} to={{ x: 34, y: insets.top + 26 }} />
 
       <BuildSheet visible={showBuild} onClose={() => setShowBuild(false)} />
+      <SettingsSheet visible={showSettings} onClose={() => setShowSettings(false)} />
       <NewsSheet
         visible={showNews}
         onClose={() => {

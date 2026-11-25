@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { CoinIcon, ScrollIcon, ShieldIcon } from '../art/Icons';
+import { CoinIcon, GearIcon, ScrollIcon, ShieldIcon } from '../art/Icons';
 import { MAX_SHIELDS } from '../game/config';
 import { islandDef, islandProgress } from '../game/engine';
 import { formatCoins, t } from '../i18n';
@@ -10,7 +10,7 @@ import { useGame } from '../state/GameProvider';
 import { GameText } from '../ui/GameText';
 import { useCountUp } from '../ui/useCountUp';
 
-export function Hud({ onOpenNews }: { onOpenNews: () => void }) {
+export function Hud({ onOpenNews, onOpenSettings }: { onOpenNews: () => void; onOpenSettings: () => void }) {
   const { state } = useGame();
   const def = islandDef(state.islandIndex);
   const progress = islandProgress(state);
@@ -46,7 +46,12 @@ export function Hud({ onOpenNews }: { onOpenNews: () => void }) {
           ))}
         </LinearGradient>
 
-        <Pressable onPress={onOpenNews} hitSlop={8} style={styles.newsBtn}>
+        <Pressable onPress={onOpenSettings} hitSlop={8} style={styles.settingsBtn}>
+          <LinearGradient colors={['#c98a4b', '#7a4a1f']} style={styles.newsFace}>
+            <GearIcon size={28} />
+          </LinearGradient>
+        </Pressable>
+        <Pressable onPress={onOpenNews} hitSlop={8}>
           <LinearGradient colors={['#c98a4b', '#7a4a1f']} style={styles.newsFace}>
             <ScrollIcon size={30} />
           </LinearGradient>
@@ -107,7 +112,7 @@ const styles = StyleSheet.create({
     borderColor: '#4fb3ff',
     gap: 1,
   },
-  newsBtn: { marginLeft: 'auto' },
+  settingsBtn: { marginLeft: 'auto' },
   newsFace: {
     width: 44,
     height: 44,

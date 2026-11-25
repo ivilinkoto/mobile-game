@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 
+import { sfx } from '../audio/sound';
 import { Avatar } from '../art/Avatar';
 import { Building } from '../art/Buildings';
 import { CannonIcon, ChestIcon, CoinIcon, DigSpotIcon, MapIcon, ShieldIcon, StormIcon } from '../art/Icons';
@@ -103,6 +104,8 @@ export function AttackSheet({ onResult }: { onResult: (coins: number, text: stri
                   setChosen(null);
                   if (r) {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+                    sfx('cannon');
+                    setTimeout(() => sfx(r.blocked ? 'shield' : 'hit'), 380);
                     onResult(r.coins, r.blocked ? t.blocked : t.hit);
                   }
                 }}
@@ -157,7 +160,11 @@ export function RaidSheet() {
               key={i}
               disabled={reveal}
               onPress={() => {
-                if (dig(i) !== null) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                if (dig(i) !== null) {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                  sfx('dig');
+                  setTimeout(() => sfx(value === best ? 'chest' : 'coins', 0.8), 150);
+                }
               }}
               style={({ pressed }) => [styles.spotWrap, pressed && { transform: [{ scale: 0.94 }] }]}
             >
@@ -217,6 +224,7 @@ export function StormSheet({ onResult }: { onResult: (coins: number, text: strin
               const coins = unleashStorm(r.id);
               if (coins !== null) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+                sfx('thunder');
                 onResult(coins, t.storm);
               }
             }}

@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Polyline } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 
+import { chainNote, sfx } from '../audio/sound';
 import { TileIcon } from '../art/Icons';
 import { isAdjacent } from '../game/board';
 import { BOARD_COLS, BOARD_ROWS, MIN_CHAIN, STORM_BACKFIRE } from '../game/config';
@@ -126,6 +127,7 @@ export function SkyBoard({ board, width, disabled, hint, onChain, onStormTap, pr
       const p = cellFromEvent(e);
       if (!p) return;
       Haptics.selectionAsync().catch(() => {});
+      chainNote(0);
       setPath([p]);
       live.current.path = [p];
     },
@@ -149,6 +151,7 @@ export function SkyBoard({ board, width, disabled, hint, onChain, onStormTap, pr
       }
       if (next) {
         Haptics.selectionAsync().catch(() => {});
+        chainNote(next.length - 1);
         live.current.path = next;
         setPath(next);
       }
@@ -163,6 +166,7 @@ export function SkyBoard({ board, width, disabled, hint, onChain, onStormTap, pr
         live.current.onChain(cur);
       } else if (cur.length > 0) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+        sfx('error');
       }
     },
     onResponderTerminate: () => {

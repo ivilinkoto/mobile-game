@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
+import { sfx } from '../audio/sound';
 import { CannonIcon, EnergyIcon, MapIcon, ScrollIcon, ShieldIcon, StarIcon, StormIcon } from '../art/Icons';
 import { IslandScene } from '../art/IslandScene';
 import { themeFor } from '../art/themes';
@@ -67,6 +68,9 @@ export function IslandCompleteSheet() {
   const { state, dismissIslandComplete } = useGame();
   const done = state.justCompletedIsland;
   const next = islandDef(state.islandIndex);
+  useEffect(() => {
+    if (done !== null) sfx('fanfare');
+  }, [done]);
   return (
     <Sheet visible={done !== null} title={t.islandComplete} icon={<StarIcon size={30} />}>
       <View style={styles.scene}>

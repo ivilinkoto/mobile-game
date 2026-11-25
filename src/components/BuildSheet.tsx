@@ -2,6 +2,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 
+import { sfx } from '../audio/sound';
 import { Building } from '../art/Buildings';
 import { CoinIcon, HammerIcon, StarIcon } from '../art/Icons';
 import { themeFor } from '../art/themes';
@@ -63,7 +64,10 @@ export function BuildSheet({ visible, onClose }: { visible: boolean; onClose: ()
                   disabled={!affordable}
                   onPress={() => {
                     const ok = damaged ? repair(b) : build(b);
-                    if (ok) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                    if (ok) {
+                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                      sfx('build');
+                    }
                   }}
                   contentStyle={styles.btn}
                 >
