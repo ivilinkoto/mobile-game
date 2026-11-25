@@ -110,7 +110,9 @@ export async function startAudio(): Promise<void> {
   if (started) return;
   started = true;
   try {
-    await setAudioModeAsync({ playsInSilentMode: false, interruptionMode: 'mixWithOthers', shouldPlayInBackground: false });
+    // Play even when the device is on vibrate/silent (on Android `false` mutes the app completely);
+    // players control loudness with the volume buttons and the in-game toggles.
+    await setAudioModeAsync({ playsInSilentMode: true, interruptionMode: 'mixWithOthers', shouldPlayInBackground: false });
   } catch {
     // ignore
   }
@@ -126,6 +128,12 @@ export async function startAudio(): Promise<void> {
     setIsAudioActiveAsync(s === 'active').catch(() => {});
     if (s === 'active') applyMusic();
   });
+}
+
+/** Make sure the music is running (call from a user tap, e.g. the Play button). */
+export function ensureMusic(): void {
+  setIsAudioActiveAsync(true).catch(() => {});
+  applyMusic();
 }
 
 export function getAudioSettings(): AudioSettings {

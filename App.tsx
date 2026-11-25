@@ -4,7 +4,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Rubik_500Medium, Rubik_700Bold, Rubik_800ExtraBold, Rubik_900Black, useFonts } from '@expo-google-fonts/rubik';
 
-import { startAudio } from './src/audio/sound';
+import { ensureMusic, startAudio } from './src/audio/sound';
 import { loadLang } from './src/i18n';
 import { GameScreen } from './src/screens/GameScreen';
 import { TitleScreen } from './src/screens/TitleScreen';
@@ -29,7 +29,12 @@ export default function App() {
     <SafeAreaProvider>
       <StatusBar style="light" />
       <GameProvider fallback={loading}>
-        {playing ? <GameScreen /> : <TitleScreen onPlay={() => setPlaying(true)} />}
+        {playing ? <GameScreen /> : <TitleScreen
+            onPlay={() => {
+              ensureMusic();
+              setPlaying(true);
+            }}
+          />}
       </GameProvider>
     </SafeAreaProvider>
   );
