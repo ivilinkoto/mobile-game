@@ -1,0 +1,60 @@
+# Builds an installable Android APK of the current branch on GitHub's servers.
+# The APK is attached to the run as the "storm-isles-apk" artifact: open the
+# run in the Actions tab and download it from the "Artifacts" section.
+# No Expo account needed.
+#
+# Runs on every push to the development branch, or manually from the
+# Actions tab ("Run workflow").
+
+name: Android APK
+
+on:
+  push:
+    branches: [ccr-6a94f35b-54hel5]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate the native Android project
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Build the APK
+        working-directory: android
+        # The Expo template signs release builds with the debug key:
+        # fine for testing on your own device, not for the Play Store.
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Name the file
+        run: cp android/app/build/outputs/apk/release/app-release.apk storm-isles.apk
+
+      - name: Attach the APK to this run
+        uses: actions/upload-artifact@v4
+        with:
+          name: storm-isles-apk
+          path: storm-isles.apk
+          retention-days: 30
