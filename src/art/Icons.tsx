@@ -2,7 +2,10 @@
 
 import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 
+import { Image } from 'react-native';
+
 import type { SymbolId } from '../game/types';
+import { SYMBOL_IMAGES } from './images';
 import { useUid } from './useUid';
 
 interface IconProps {
@@ -11,8 +14,13 @@ interface IconProps {
 
 const OUTLINE = '#3a2210';
 
+function Painted({ id, size }: { id: SymbolId; size: number }) {
+  return <Image source={SYMBOL_IMAGES[id]} style={{ width: size, height: size }} />;
+}
+
 export function CoinIcon({ size }: IconProps) {
   const id = useUid('coin');
+  if (SYMBOL_IMAGES.coin) return <Painted id="coin" size={size} />;
   return (
     <Svg width={size} height={size} viewBox="0 0 100 100">
       <Defs>
@@ -151,6 +159,7 @@ export function MapIcon({ size }: IconProps) {
 
 export function StormIcon({ size }: IconProps) {
   const id = useUid('storm');
+  if (SYMBOL_IMAGES.storm) return <Painted id="storm" size={size} />;
   return (
     <Svg width={size} height={size} viewBox="0 0 100 100">
       <Defs>

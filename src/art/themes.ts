@@ -4,6 +4,7 @@
 export type DecorKind = 'palm' | 'pine' | 'rock' | 'coral' | 'cloud';
 
 export interface IslandTheme {
+  key: string;
   skyTop: string;
   skyBottom: string;
   seaTop: string;
@@ -28,6 +29,7 @@ export interface IslandTheme {
 
 export const THEMES: Record<string, IslandTheme> = {
   tropic: {
+    key: 'tropic',
     skyTop: '#5fd0ff',
     skyBottom: '#c8f1ff',
     seaTop: '#25b7d9',
@@ -49,6 +51,7 @@ export const THEMES: Record<string, IslandTheme> = {
     landmark: 'none',
   },
   glacier: {
+    key: 'glacier',
     skyTop: '#8fc3f2',
     skyBottom: '#e6f4ff',
     seaTop: '#4c94c9',
@@ -70,6 +73,7 @@ export const THEMES: Record<string, IslandTheme> = {
     landmark: 'iceberg',
   },
   volcano: {
+    key: 'volcano',
     skyTop: '#ff9a62',
     skyBottom: '#ffd9a8',
     seaTop: '#2f6b7a',
@@ -91,6 +95,7 @@ export const THEMES: Record<string, IslandTheme> = {
     landmark: 'volcano',
   },
   sunken: {
+    key: 'sunken',
     skyTop: '#1d7fb0',
     skyBottom: '#56c2e0',
     seaTop: '#13628f',
@@ -112,6 +117,7 @@ export const THEMES: Record<string, IslandTheme> = {
     landmark: 'ruins',
   },
   sky: {
+    key: 'sky',
     skyTop: '#7f9cff',
     skyBottom: '#f8d8ff',
     seaTop: '#c3d5ff',

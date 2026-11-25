@@ -1,10 +1,11 @@
 // Five building archetypes drawn in a 100×100 box with the ground at y=92.
 // Shapes grow and gain details with level; colours come from the island theme.
 
-import { useEffect, useState } from 'react';
-import { Animated, Easing, View } from 'react-native';
+import { useEffect, useState, type ComponentProps } from 'react';
+import { Animated, Easing, Image, View } from 'react-native';
 import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, Polygon, Rect, Stop } from 'react-native-svg';
 
+import { buildingImage } from './images';
 import type { IslandTheme } from './themes';
 import { useUid } from './useUid';
 
@@ -23,6 +24,8 @@ interface Props {
 
 export function Building({ type, level, damaged, theme, size, still }: Props) {
   const id = useUid('b');
+  const painted = buildingImage(theme.key, type, level);
+  if (painted) return <PaintedBuilding source={painted} level={level} damaged={damaged} size={size} />;
   const scale = level <= 1 ? 0.8 : level === 2 ? 0.9 : 1;
   const hasBlades = type === 2 && level > 0;
 
@@ -59,6 +62,35 @@ export function Building({ type, level, damaged, theme, size, still }: Props) {
       </Svg>
       {hasBlades ? (
         <Blades size={size * 0.62 * scale} theme={theme} spinning={!damaged && !still} gold={level >= 3} center={{ x: size * 0.5, y: size * (92 - (92 - 40) * scale) / 100 }} />
+      ) : null}
+    </View>
+  );
+}
+
+/** Painted building art: grows a little with level, damage drawn on top. */
+function PaintedBuilding({
+  source,
+  level,
+  damaged,
+  size,
+}: {
+  source: ComponentProps<typeof Image>['source'];
+  level: number;
+  damaged: boolean;
+  size: number;
+}) {
+  const scale = level <= 1 ? 0.86 : level === 2 ? 0.93 : 1;
+  const s = size * scale;
+  return (
+    <View style={{ width: size, height: size }}>
+      <Image
+        source={source}
+        style={{ position: 'absolute', width: s, height: s, left: (size - s) / 2, top: size * 0.97 - s * 0.97 }}
+      />
+      {damaged ? (
+        <Svg width={size} height={size} viewBox="0 0 100 100" style={{ position: 'absolute' }}>
+          <Damage />
+        </Svg>
       ) : null}
     </View>
   );

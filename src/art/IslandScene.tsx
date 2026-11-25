@@ -2,12 +2,14 @@
 // and the five building plots placed with depth sorting.
 
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
-import { Animated, Easing, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { Animated, Easing, Image, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { LinearGradient as Fade } from 'expo-linear-gradient';
 import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
 import { MAX_BUILDING_LEVEL } from '../game/config';
 import { Building } from './Buildings';
 import { StarIcon } from './Icons';
+import { ISLAND_IMAGES, type IslandImage } from './images';
 import type { DecorKind, IslandTheme } from './themes';
 import { useUid } from './useUid';
 
@@ -48,32 +50,51 @@ export function IslandScene({ theme, buildings, damaged, compact, insetTop = 0, 
     if (width !== box.w || height !== box.h) setBox({ w: width, h: height });
   };
 
-  // Fit the island (4:3) between the overlays; it may bleed a little past the
-  // screen edges (that is only sea) so it reads big on narrow phones.
-  const skyH = compact ? 0 : Math.max(box.h * 0.12, insetTop * 0.75);
+  const painted = ISLAND_IMAGES[theme.key];
+  const skyH = compact || painted ? 0 : Math.max(box.h * 0.12, insetTop * 0.75);
   const availH = box.h - insetTop - insetBottom;
-  const scale = Math.min((box.w * (compact ? 1 : 1.1)) / VB_W, availH / VB_H);
-  const iw = VB_W * scale;
-  const ih = VB_H * scale;
+
+  // Island rectangle on screen + how island units map to pixels.
+  let iw: number, ih: number, unit: number;
+  let plots: { x: number; y: number; w: number }[];
+  if (painted) {
+    // painted island: the island itself covers ~78% of the image width
+    unit = Math.min((box.w * (compact ? 1.1 : 1.22)) / painted.width, (availH + 70) / painted.height);
+    iw = painted.width * unit;
+    ih = painted.height * unit;
+    plots = painted.plots;
+  } else {
+    // vector island (4:3); may bleed a little past the edges (only sea)
+    unit = Math.min((box.w * (compact ? 1 : 1.1)) / VB_W, availH / VB_H);
+    iw = VB_W * unit;
+    ih = VB_H * unit;
+    plots = PLOTS;
+  }
   const ix = (box.w - iw) / 2;
   const iy = insetTop + (availH - ih) / 2;
 
-  const order = PLOTS.map((p, i) => ({ ...p, i })).sort((a, b) => a.y - b.y);
+  const order = plots.map((p, i) => ({ ...p, i })).sort((a, b) => a.y - b.y);
 
   return (
     <View style={StyleSheet.absoluteFill} onLayout={onLayout}>
       {box.w > 0 ? (
         <>
-          <Backdrop theme={theme} w={box.w} h={box.h} skyH={skyH} />
-          {!compact ? <Waves w={box.w} h={box.h} top={skyH} color={theme.foam} /> : null}
-          {!compact ? <Clouds w={box.w} skyH={skyH} /> : null}
-          <View style={{ position: 'absolute', left: ix, top: iy, width: iw, height: ih }}>
-            <IslandBase theme={theme} w={iw} h={ih} />
-          </View>
+          {painted ? (
+            <PaintedIsland img={painted} rect={{ x: ix, y: iy, w: iw, h: ih }} />
+          ) : (
+            <>
+              <Backdrop theme={theme} w={box.w} h={box.h} skyH={skyH} />
+              {!compact ? <Waves w={box.w} h={box.h} top={skyH} color={theme.foam} /> : null}
+              {!compact ? <Clouds w={box.w} skyH={skyH} /> : null}
+              <View style={{ position: 'absolute', left: ix, top: iy, width: iw, height: ih }}>
+                <IslandBase theme={theme} w={iw} h={ih} />
+              </View>
+            </>
+          )}
           {order.map((p) => {
-            const size = p.w * scale;
-            const left = ix + p.x * scale - size / 2;
-            const top = iy + p.y * scale - size * 0.92;
+            const size = p.w * unit;
+            const left = ix + p.x * unit - size / 2;
+            const top = iy + p.y * unit - size * 0.92;
             return (
               <View key={p.i} style={{ position: 'absolute', left, top, width: size, height: size }} pointerEvents="none">
                 <PoppingBuilding
@@ -98,6 +119,56 @@ export function IslandScene({ theme, buildings, damaged, compact, insetTop = 0, 
       ) : null}
     </View>
   );
+}
+
+/** A painted island image, blended into a sea-coloured screen at its edges. */
+function PaintedIsland({
+  img,
+  rect,
+}: {
+  img: IslandImage;
+  rect: { x: number; y: number; w: number; h: number };
+}) {
+  const fade = Math.min(60, rect.h * 0.15);
+  return (
+    <>
+      <Fade colors={[img.seaTop, img.seaBottom]} style={StyleSheet.absoluteFill} />
+      <Image source={img.source} style={{ position: 'absolute', left: rect.x, top: rect.y, width: rect.w, height: rect.h }} />
+      <Fade
+        pointerEvents="none"
+        colors={[img.seaTop, withAlpha(img.seaTop, 0)]}
+        style={{ position: 'absolute', left: 0, right: 0, top: rect.y - 1, height: fade }}
+      />
+      <Fade
+        pointerEvents="none"
+        colors={[withAlpha(img.seaBottom, 0), img.seaBottom]}
+        style={{ position: 'absolute', left: 0, right: 0, top: rect.y + rect.h - fade + 1, height: fade }}
+      />
+      {rect.x > 0 ? (
+        <>
+          <Fade
+            pointerEvents="none"
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            colors={[img.seaTop, withAlpha(img.seaTop, 0)]}
+            style={{ position: 'absolute', top: 0, bottom: 0, left: rect.x - 1, width: fade }}
+          />
+          <Fade
+            pointerEvents="none"
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            colors={[withAlpha(img.seaBottom, 0), img.seaBottom]}
+            style={{ position: 'absolute', top: 0, bottom: 0, left: rect.x + rect.w - fade + 1, width: fade }}
+          />
+        </>
+      ) : null}
+    </>
+  );
+}
+
+function withAlpha(hex: string, a: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 }
 
 function PoppingBuilding(props: ComponentProps<typeof Building>) {
