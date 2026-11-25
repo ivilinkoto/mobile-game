@@ -5,7 +5,7 @@ import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, RadialGradient, Re
 import { Image } from 'react-native';
 
 import type { SymbolId, TileKind } from '../game/types';
-import { SYMBOL_IMAGES } from './images';
+import { SYMBOL_IMAGES, TILE_IMAGES } from './images';
 import { useUid } from './useUid';
 
 interface IconProps {
@@ -16,6 +16,10 @@ const OUTLINE = '#3a2210';
 
 function Painted({ id, size }: { id: SymbolId; size: number }) {
   return <Image source={SYMBOL_IMAGES[id]} style={{ width: size, height: size }} />;
+}
+
+function PaintedTile({ kind, size }: { kind: TileKind; size: number }) {
+  return <Image source={TILE_IMAGES[kind]} style={{ width: size, height: size }} />;
 }
 
 export function CoinIcon({ size }: IconProps) {
@@ -325,6 +329,7 @@ function Cloud({ fill, stroke, y = 0 }: { fill: string; stroke: string; y?: numb
 
 export function SunIcon({ size }: IconProps) {
   const id = useUid('sun');
+  if (TILE_IMAGES.sun) return <PaintedTile kind="sun" size={size} />;
   return (
     <Svg width={size} height={size} viewBox="0 0 100 100">
       <Defs>
@@ -353,6 +358,7 @@ export function SunIcon({ size }: IconProps) {
 
 export function WindIcon({ size }: IconProps) {
   const id = useUid('wind');
+  if (TILE_IMAGES.wind) return <PaintedTile kind="wind" size={size} />;
   return (
     <Svg width={size} height={size} viewBox="0 0 100 100">
       <Defs>
@@ -372,6 +378,7 @@ export function WindIcon({ size }: IconProps) {
 
 export function BoltIcon({ size }: IconProps) {
   const id = useUid('bolt');
+  if (TILE_IMAGES.bolt) return <PaintedTile kind="bolt" size={size} />;
   return (
     <Svg width={size} height={size} viewBox="0 0 100 100">
       <Defs>
@@ -393,6 +400,7 @@ export function BoltIcon({ size }: IconProps) {
 
 export function RainIcon({ size }: IconProps) {
   const id = useUid('rain');
+  if (TILE_IMAGES.rain) return <PaintedTile kind="rain" size={size} />;
   return (
     <Svg width={size} height={size} viewBox="0 0 100 100">
       <Defs>
@@ -418,6 +426,7 @@ export function RainIcon({ size }: IconProps) {
 
 export function StormCloudIcon({ size }: IconProps) {
   const id = useUid('scl');
+  if (TILE_IMAGES.storm) return <PaintedTile kind="storm" size={size} />;
   return (
     <Svg width={size} height={size} viewBox="0 0 100 100">
       <Defs>

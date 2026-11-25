@@ -21,36 +21,72 @@ from PIL import Image
 from scipy import ndimage
 
 
-def background_mask(rgb: np.ndarray) -> np.ndarray:
+def background_mask(
+    rgb: np.ndarray, white_only: bool = False, white_level: float = 0.955, warm_shadows: bool = False
+) -> np.ndarray:
     mx = rgb.max(axis=2)
     mn = rgb.min(axis=2)
     sat = (mx - mn) / np.maximum(mx, 1e-6)
     r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    border = np.concatenate([rgb[0], rgb[-1], rgb[:, 0], rgb[:, -1]])
+    bg_colour = np.median(border, axis=0)
+    if bg_colour.min() < 0.85:
+        # coloured / dark backdrop (e.g. for white objects): key out that colour
+        dist = np.sqrt(((rgb - bg_colour) ** 2).sum(axis=2))
+        labels, _ = ndimage.label(dist < 0.12)
+        edge = np.unique(np.concatenate([labels[0], labels[-1], labels[:, 0], labels[:, -1]]))
+        return np.isin(labels, edge[edge != 0])
     # near-pure white paper (strict, so cream/white objects survive)
-    white = (mx > 0.955) & (sat < 0.07)
-    # the soft floor shadows these models paint are pale and blue-ish grey
-    shadow = (mx > 0.55) & (b >= r) & (b >= g - 0.02) & (sat < 0.42)
-    candidate = white | shadow
+    white = (mx > white_level) & (sat < 0.07)
+    # the soft floor shadows these models paint: pale, low-saturation,
+    # neutral grey to blue-ish grey (never warm)
+    shadow = (mx > 0.5) & (mx < 0.985) & (sat < 0.22) & (b >= r - 0.015) & (b >= g - 0.03)
+    if warm_shadows:  # shadows tinted by a warm object (e.g. the sun)
+        shadow = shadow | ((mx > 0.5) & (mx < 0.975) & (sat < 0.6))
+    candidate = white if white_only else (white | shadow)
     labels, _ = ndimage.label(candidate)
     border = np.unique(np.concatenate([labels[0], labels[-1], labels[:, 0], labels[:, -1]]))
     border = border[border != 0]
     return np.isin(labels, border)
 
 
-def cutout(src: str, dst: str, mode: str, size: int) -> None:
+def cutout(
+    src: str,
+    dst: str,
+    mode: str,
+    size: int,
+    white_only: bool = False,
+    white_level: float = 0.955,
+    warm_shadows: bool = False,
+    close: int = 0,
+) -> None:
     im = Image.open(src).convert('RGB')
     rgb = np.asarray(im).astype(np.float32) / 255.0
-    bg = background_mask(rgb)
+    bg = background_mask(rgb, white_only, white_level, warm_shadows)
     # close tiny holes, then soften the edge
     fg = ndimage.binary_opening(~bg, iterations=1)
     fg = ndimage.binary_fill_holes(fg)
-    # drop leftover specks / thin shadow slivers: keep big components only
+    # drop leftover specks and detached floor shadows: keep the main object,
+    # plus other sizeable parts that are clearly coloured (raindrops, bolts…)
     labels, n = ndimage.label(fg)
     if n > 1:
-        sizes = ndimage.sum(fg, labels, range(1, n + 1))
-        keep = np.flatnonzero(sizes >= sizes.max() * 0.04) + 1
+        idx = range(1, n + 1)
+        sizes = ndimage.sum(fg, labels, idx)
+        mx, mn = rgb.max(axis=2), rgb.min(axis=2)
+        sat = (mx - mn) / np.maximum(mx, 1e-6)
+        mean_sat = ndimage.mean(sat, labels, idx)
+        biggest = int(np.argmax(sizes))
+        keep = [
+            i + 1
+            for i in range(n)
+            if i == biggest or (sizes[i] >= sizes.max() * 0.005 and (mean_sat[i] > 0.3 or not white_only) and sizes[i] >= sizes.max() * (0.005 if white_only else 0.04))
+        ]
         fg = np.isin(labels, keep)
     fg = ndimage.binary_opening(fg, iterations=3) | ndimage.binary_erosion(fg, iterations=6)
+    if close:
+        # fill "bites" where a white object melted into the white backdrop
+        disk = np.hypot(*np.mgrid[-close : close + 1, -close : close + 1]) <= close
+        fg = ndimage.binary_fill_holes(ndimage.binary_closing(fg, structure=disk))
     alpha = ndimage.gaussian_filter(fg.astype(np.float32), sigma=1.0)
     alpha = np.clip((alpha - 0.15) / 0.85, 0, 1)
     # un-mix the white background from semi-transparent edge pixels
@@ -78,5 +114,13 @@ if __name__ == '__main__':
     ap.add_argument('dst')
     ap.add_argument('--mode', choices=['icon', 'building'], default='icon')
     ap.add_argument('--size', type=int, default=512)
+    ap.add_argument(
+        '--white-only',
+        action='store_true',
+        help='only remove white background (for pale blue/grey objects); detached pale shadows are dropped',
+    )
+    ap.add_argument('--white-level', type=float, default=0.955, help='raise (e.g. 0.985) for white objects')
+    ap.add_argument('--warm-shadows', action='store_true', help='also remove warm-tinted shadows (e.g. under the sun)')
+    ap.add_argument('--close', type=int, default=0, help='radius in px to fill bites in white objects (e.g. 40)')
     args = ap.parse_args()
-    cutout(args.src, args.dst, args.mode, args.size)
+    cutout(args.src, args.dst, args.mode, args.size, args.white_only, args.white_level, args.warm_shadows, args.close)

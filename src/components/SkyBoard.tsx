@@ -19,7 +19,7 @@ const TILE_BG: Record<TileKind, [string, string]> = {
   sun: ['#fff1b8', '#ffd36b'],
   wind: ['#e3fbf6', '#a6e9dc'],
   bolt: ['#e4dcff', '#b3a3f0'],
-  rain: ['#cfe8ff', '#6fb3ef'],
+  rain: ['#7fbcf0', '#2a6fc4'],
   storm: ['#7d5cf0', '#3b1f99'],
 };
 const LINE: Record<TileKind, string> = {

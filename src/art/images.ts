@@ -9,11 +9,20 @@
 
 import type { ImageSourcePropType } from 'react-native';
 
-import type { SymbolId } from '../game/types';
+import type { SymbolId, TileKind } from '../game/types';
 
 export const SYMBOL_IMAGES: Partial<Record<SymbolId, ImageSourcePropType>> = {
   coin: require('../../assets/art/preview/coin.png'),
   storm: require('../../assets/art/preview/storm.png'),
+};
+
+/** Weather clouds on the sky board. */
+export const TILE_IMAGES: Partial<Record<TileKind, ImageSourcePropType>> = {
+  sun: require('../../assets/art/preview/tile_sun.png'),
+  bolt: require('../../assets/art/preview/tile_bolt.png'),
+  rain: require('../../assets/art/preview/tile_rain.png'),
+  storm: require('../../assets/art/preview/tile_storm.png'),
+  // wind: waiting for a better render (the first one looked like tentacles)
 };
 
 /**
